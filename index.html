@@ -9,9 +9,14 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="ToDo">
 <meta name="theme-color" content="#F0EFF9">
-<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
-<link rel="manifest" href="manifest.webmanifest">
+<!-- NO manifest link, deliberately: with only the classic apple-mobile-web-app
+     meta tags, iOS keeps ALL navigation inside the full-screen standalone
+     webview — including the cross-origin redirect to script.google.com below.
+     With a manifest, that redirect would be "out of scope" and iOS would slap
+     browser chrome on it. (v2: redirect architecture — the old iframe approach
+     died when Google started serving frame-blocking headers on /exec pages.) -->
 <style>
   :root {
     --bg: #F0EFF9; --paper: #FFFFFF; --ink: #1A1835; --muted: #7874A8;
@@ -20,7 +25,6 @@
   html, body { margin: 0; padding: 0; height: 100%; background: var(--bg);
     font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', Arial, sans-serif;
     color: var(--ink); -webkit-font-smoothing: antialiased; }
-  #app { position: fixed; inset: 0; border: 0; width: 100%; height: 100%; display: none; }
 
   #gate { min-height: 100dvh; display: grid; place-items: center; padding: 24px; box-sizing: border-box; }
   .card {
@@ -56,13 +60,10 @@
   button:active { transform: scale(0.97); }
   .hint { font-size: 10px; color: #A5A1C9; letter-spacing: 0.8px; text-transform: uppercase; margin-top: 16px;
     font-family: 'SF Mono', ui-monospace, monospace; }
-  .setup { text-align: left; font-size: 13px; line-height: 1.6; color: var(--ink); }
-  .setup code { background: rgba(91,79,207,0.08); border-radius: 4px; padding: 1px 5px; font-size: 12px; }
+  .opening { color: var(--muted); font-size: 14px; }
 </style>
 </head>
 <body>
-
-<iframe id="app" allow="clipboard-read; clipboard-write; fullscreen"></iframe>
 
 <div id="gate">
   <form class="card" id="card" onsubmit="return go(event)">
@@ -83,11 +84,14 @@
 
 <script>
 // ── Encrypted vault ─────────────────────────────────────────────────────────
-// Generated with encrypt-tool.html (it encrypts your /exec URL with your
-// passcode). Until you paste it, this page shows setup instructions.
-const VAULT = { salt: "/4MZq/bUSsCJl5MnClGaLg==", iv: "0jw5gw4QSBX1ekRB", data: "vR/MbvRzmIYOcWldTFEQRvEm8QBE8Jss9dgiHK3uhn89WBifgYVYANevc3ee5DJPhCFzvH4wXQnNrKlMYKfV14RjtL1y4ZZpIGhKUfj25qMA5kAiM6hnIGw8c4a9rdgS6lTYEKCQwit9PSJIxBDwsAL7t3vhUsA8t9x+hGAkwf2GW8QvnbdqfewH/88LaThDYzX9pAzUI3neHWCA4VpkQzJCY2XDOVEsMpEOGZoXeAZ9nWiq+IpyOw+Z7iJMTFveGngD" };
+// Holds the dashboard /exec URL (incl. access key) as an AES-256-GCM blob.
+// The passcode decrypts it; the page then NAVIGATES to the dashboard
+// (location.replace) — no iframe, so Google's frame-blocking headers on
+// script.google.com can't break anything.
+const VAULT = { salt: "tW5x0oo6HeMqRFVsSPQCeA==", iv: "e7s9W1qtYAFZ98hR", data: "njZM3oDSzdkpwID+C85pVhcmS/6qMgn010/pMXxyJUqhYHkhZqhHIfszDDngPI0WaP+42BHfAiC995wJOEmgYjEVqh/Ybt2vkVnBQrAO036v92sxtwHUiRqOl7LTmdpm3BxUJM1WU05yNDFVdrflPMeAGJ99zAimvCsrZBLfqNn6SrV1EHl9I+M64hu9s71drwPR6f61W1/MiUyod/KlQA8Yk0pRx5Bpfko7NVmI9gff7ZscxQ==" };
 
-const LS_KEY = 'todo.exec.url';
+// v2: bumped so devices that remembered the old (iframe-era) entry re-prompt once.
+const LS_KEY = 'todo.exec.url.v2';
 
 function b64d(s) { return Uint8Array.from(atob(s), c => c.charCodeAt(0)); }
 
@@ -104,11 +108,9 @@ async function decryptVault(pass) {
   return new TextDecoder().decode(plain);
 }
 
-function mount(url) {
-  const f = document.getElementById('app');
-  f.src = url;
-  f.style.display = 'block';
-  document.getElementById('gate').remove();
+function open_(url) {
+  document.getElementById('body').innerHTML = '<p class="opening">Opening the dashboard…</p>';
+  location.replace(url);
 }
 
 async function go(e) {
@@ -117,7 +119,7 @@ async function go(e) {
   try {
     const url = await decryptVault(pw.value);
     try { localStorage.setItem(LS_KEY, url); } catch (_) {}
-    mount(url);
+    open_(url);
   } catch (_) {
     const card = document.getElementById('card');
     pw.classList.add('err'); card.classList.add('shake');
@@ -127,18 +129,11 @@ async function go(e) {
   return false;
 }
 
-// Boot: setup notice → remembered device → passcode gate
+// Boot: remembered device → straight to the dashboard; otherwise passcode gate
 (function () {
-  if (!VAULT) {
-    document.getElementById('body').innerHTML =
-      '<div class="setup">Almost there — open <code>encrypt-tool.html</code> on your Mac, ' +
-      'encrypt your dashboard URL with a passcode, and paste the generated block into ' +
-      '<code>index.html</code> where it says <code>const VAULT = null</code>.</div>';
-    return;
-  }
   let saved = null;
   try { saved = localStorage.getItem(LS_KEY); } catch (_) {}
-  if (saved) mount(saved);
+  if (saved) open_(saved);
 })();
 </script>
 </body>
