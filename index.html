@@ -108,18 +108,34 @@ async function decryptVault(pass) {
   return new TextDecoder().decode(plain);
 }
 
+// Standalone = launched from the home-screen icon. In a normal Safari tab we
+// deliberately DON'T auto-redirect: iOS takes the home-screen icon from the
+// page you're on when you tap "Add to Home Screen", so the branded gate page
+// must stay visible in Safari — otherwise you get Google's grey icon.
+const IS_STANDALONE = (navigator.standalone === true) ||
+  (window.matchMedia && matchMedia('(display-mode: standalone)').matches);
+
+let _url = null;
+
 function open_(url) {
   document.getElementById('body').innerHTML = '<p class="opening">Opening the dashboard…</p>';
   location.replace(url);
+}
+
+function showOpenCard() {
+  document.getElementById('body').innerHTML =
+    '<p>Unlocked on this device.</p>' +
+    '<button type="button" onclick="open_(_url)">Open dashboard</button>' +
+    '<div class="hint">Share → Add to Home Screen on THIS page<br>to install the app with its icon</div>';
 }
 
 async function go(e) {
   e.preventDefault();
   const pw = document.getElementById('pw');
   try {
-    const url = await decryptVault(pw.value);
-    try { localStorage.setItem(LS_KEY, url); } catch (_) {}
-    open_(url);
+    _url = await decryptVault(pw.value);
+    try { localStorage.setItem(LS_KEY, _url); } catch (_) {}
+    if (IS_STANDALONE) open_(_url); else showOpenCard();
   } catch (_) {
     const card = document.getElementById('card');
     pw.classList.add('err'); card.classList.add('shake');
@@ -129,11 +145,14 @@ async function go(e) {
   return false;
 }
 
-// Boot: remembered device → straight to the dashboard; otherwise passcode gate
+// Boot: home-screen app + remembered → straight to the dashboard.
+// Safari tab + remembered → show the Open button (page stays for icon-adding).
 (function () {
   let saved = null;
   try { saved = localStorage.getItem(LS_KEY); } catch (_) {}
-  if (saved) open_(saved);
+  if (!saved) return;
+  _url = saved;
+  if (IS_STANDALONE) open_(saved); else showOpenCard();
 })();
 </script>
 </body>
