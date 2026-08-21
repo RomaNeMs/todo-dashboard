@@ -1,163 +1,3046 @@
-<!doctype html>
-<html lang="en">
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
 <head>
-<meta charset="utf-8">
-<title>ToDo</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<meta name="robots" content="noindex, nofollow">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#5B4FCF">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="ToDo">
-<meta name="theme-color" content="#F0EFF9">
-<!-- touch-icon-v2.png = same purple checkmark under a NEW filename. iOS keeps a
-     separate home-screen icon cache (not in Website Data) keyed by icon URL, and
-     it was serving a stale grey copy; a fresh filename (no query string — some
-     iOS versions ignore icon URLs with one) forces a real fetch. -->
-<link rel="apple-touch-icon" sizes="180x180" href="/todo-dashboard/touch-icon-v2.png">
-<link rel="icon" type="image/png" sizes="192x192" href="/todo-dashboard/icon-192.png">
-<!-- NO manifest link, deliberately: with only the classic apple-mobile-web-app
-     meta tags, iOS keeps ALL navigation inside the full-screen standalone
-     webview — including the cross-origin redirect to script.google.com below.
-     With a manifest, that redirect would be "out of scope" and iOS would slap
-     browser chrome on it. (v2: redirect architecture — the old iframe approach
-     died when Google started serving frame-blocking headers on /exec pages.) -->
+<meta name="robots" content="noindex, nofollow">
+<title>ToDo — Dashboard</title>
+<!-- v3: this file IS the hosted app (GitHub Pages), no longer served by Apps
+     Script — so the manifest is back (everything is same-origin now) and the
+     PWA installs with the real icon, full-screen, no Google banner. -->
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" sizes="180x180" href="touch-icon-v2.png">
+<!-- Studio type system: Manrope = UI, Fraunces = section titles, JetBrains Mono = numbers.
+     Loaded from Google Fonts — same approach as the personal dashboard, works inside the GAS iframe. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<!-- Favicon + iOS home screen icon: Tonkean purple square with a white checkmark -->
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%20100%20100%22%3E%3Crect%20width%3D%22100%22%20height%3D%22100%22%20rx%3D%2222%22%20fill%3D%22%235B4FCF%22/%3E%3Cpath%20d%3D%22M28%2052%20l16%2016%20l28%20-34%22%20stroke%3D%22white%22%20stroke-width%3D%2210%22%20fill%3D%22none%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22/%3E%3C/svg%3E">
 <style>
+  /* Tonkean palette */
   :root {
-    --bg: #F0EFF9; --paper: #FFFFFF; --ink: #1A1835; --muted: #7874A8;
-    --line: #DDD9F1; --accent: #5B4FCF; --red: #DC2626; --red-light: #FCE7E7;
+    color-scheme: light;
+    --bg: #F0EFF9;
+    --s1: #FFFFFF;
+    --s2: #EEF0FE;
+    --s3: #E6E3FB;
+    --bd: #D8D4F2;
+    --text: #1A1835;
+    --muted: #7874A8;
+    --accent: #5B4FCF;
+    --accent-soft: #EEF0FE;
+    --green: #16A34A;
+    --green-bg: #E5F5EC;
+    --amber: #D97706;
+    --amber-bg: #FEF3E2;
+    --red: #DC2626;
+    --red-bg: #FCE7E7;
+    --accent-text: #4A3FB8;
+    /* Studio design language — layered shadows, gradient fills, bevel highlights */
+    --shadow: 0 1px 2px rgba(26,24,53,.05), 0 4px 16px rgba(26,24,53,.07);
+    --grad-accent: linear-gradient(180deg, #6E62E0, #5346C4);
+    --grad-red: linear-gradient(180deg, #EF5350, #DC2626);
+    --bevel-accent: inset 0 1px 0 rgba(255,255,255,.28), 0 2px 6px rgba(91,79,207,.32);
+    --bevel-soft: inset 0 1px 0 rgba(255,255,255,.55), 0 1px 2px rgba(26,24,53,.07);
+    /* Type system */
+    --font-ui: 'Manrope', -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+    --font-display: 'Fraunces', Georgia, serif;
+    --font-mono: 'JetBrains Mono', "SF Mono", Menlo, monospace;
   }
-  html, body { margin: 0; padding: 0; height: 100%; background: var(--bg);
-    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', Arial, sans-serif;
-    color: var(--ink); -webkit-font-smoothing: antialiased; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  /* No horizontal scroll, ever — the layout is a single column.
+     (iPhone Safari was sizing the viewport to overflowing content on the Daily tab.) */
+  html, body { height: 100%; overflow-x: hidden; }
+  body {
+    font-family: var(--font-ui);
+    background: var(--bg); color: var(--text);
+    font-size: 14px; line-height: 1.4;
+    -webkit-font-smoothing: antialiased;
+  }
+  button { font: inherit; cursor: pointer; border: 0; background: transparent; color: inherit; }
+  input, textarea, select { font: inherit; color: inherit; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
 
-  #gate { min-height: 100dvh; display: grid; place-items: center; padding: 24px; box-sizing: border-box; }
-  .card {
-    width: 340px; max-width: 100%; text-align: center; background: var(--paper);
-    border: 1px solid var(--line); border-radius: 16px; padding: 36px 30px 26px;
-    box-shadow: 0 1px 2px rgba(26,24,53,0.05), 0 4px 16px rgba(26,24,53,0.07);
+  .app {
+    display: flex; flex-direction: column;
+    height: 100vh; max-width: 720px; margin: 0 auto;
+    background: var(--bg);
   }
-  .card.shake { animation: shake .4s; }
-  @keyframes shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-8px); } 75% { transform: translateX(8px); } }
-  .mark {
-    width: 54px; height: 54px; border-radius: 16px; margin: 0 auto 14px;
-    background: linear-gradient(180deg, #6E62E0, #5346C4);
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.28), 0 2px 6px rgba(91,79,207,0.32);
-    display: grid; place-items: center;
+
+  /* Top bar — strip + actions */
+  .topbar {
+    display: flex; align-items: stretch;
+    background: var(--text); color: rgba(255,255,255,.88);
   }
-  .mark svg { width: 28px; height: 28px; }
-  h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.3px; margin: 0 0 6px; }
-  p  { color: var(--muted); font-size: 13px; margin: 0 0 20px; line-height: 1.5; }
-  input {
-    width: 100%; box-sizing: border-box; font-size: 20px; text-align: center; letter-spacing: 6px;
-    padding: 12px; border: 1px solid var(--line); border-radius: 10px; outline: none;
-    background: var(--bg); margin-bottom: 12px; color: var(--ink);
-    font-family: 'SF Mono', ui-monospace, monospace;
+  .strip {
+    flex: 1; min-width: 0;
+    display: flex; align-items: center; gap: 16px;
+    padding: 7px 12px; font-size: 12px;
+    overflow-x: auto; white-space: nowrap;
+    /* Hebrew first (right), number second (left) — RTL flow */
+    direction: rtl;
   }
-  input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(91,79,207,0.12); }
-  input.err { border-color: var(--red); background: var(--red-light); }
-  button {
-    width: 100%; padding: 12px; font-size: 14px; font-weight: 600; color: #fff;
-    border: none; border-radius: 10px; cursor: pointer;
-    background: linear-gradient(180deg, #6E62E0, #5346C4);
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.28), 0 2px 6px rgba(91,79,207,0.32);
+  .strip::-webkit-scrollbar { display: none; }
+  .strip .pair { display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0; }
+  .strip .lbl { color: rgba(255,255,255,.55); }
+  .strip .val {
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    /* Numbers + Latin punctuation render left-to-right, even inside RTL parent */
+    direction: ltr; unicode-bidi: isolate;
+    cursor: pointer;
+    padding: 1px 4px; border-radius: 4px;
+    transition: background .12s;
   }
-  button:active { transform: scale(0.97); }
-  .hint { font-size: 10px; color: #A5A1C9; letter-spacing: 0.8px; text-transform: uppercase; margin-top: 16px;
-    font-family: 'SF Mono', ui-monospace, monospace; }
-  .opening { color: var(--muted); font-size: 14px; }
+  .strip .val:hover { background: rgba(255,255,255,.12); }
+  .strip .val:active { background: rgba(255,255,255,.22); }
+  .strip .val.expired { color: #FF8A85; }
+
+  /* iPhone-only / Mac-only view differences.
+     `body.is-mobile` is set by JS based on user agent (iPad/iPhone). */
+  body.is-mobile #calcToggle,
+  body.is-mobile #calcWindow { display: none !important; }
+
+  /* Bank balance pair (pushed from cash flow dashboard) — pinned to the right
+     side of the strip so it's the first thing the eye lands on. With the strip
+     in RTL flex flow, order: -1 puts it at the rightmost position. */
+  .strip .balance-pair { order: -1; }
+  .strip .balance-pair .val {
+    color: #5BE49B;
+    background: rgba(91,228,155,0.12);
+    padding: 2px 9px;
+    border-radius: 999px;
+    font-weight: 600;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.08);
+  }
+  .strip .balance-pair .val.stale { color: #fbbf24; background: rgba(251,191,36,0.12); }
+
+  /* Persistent red banner shown when sync is broken */
+  .sync-banner {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    background: #dc2626;
+    color: white;
+    padding: 12px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    text-align: center;
+    z-index: 1000;
+    display: none;
+    box-shadow: 0 2px 8px rgba(0,0,0,.2);
+    line-height: 1.45;
+  }
+  .sync-banner.show { display: block; }
+  .sync-banner .sync-banner-msg { display: inline; margin-right: 12px; }
+  .sync-banner-btn {
+    margin-left: 8px;
+    padding: 4px 12px;
+    background: white;
+    color: #dc2626;
+    border: 0;
+    border-radius: 6px;
+    font-weight: 700;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .sync-banner-btn.sync-banner-btn-secondary {
+    background: transparent;
+    color: white;
+    border: 1px solid rgba(255,255,255,.5);
+  }
+
+  /* Sync indicator dot — shows server sync status */
+  .sync-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    margin: 0 8px; flex-shrink: 0;
+    transition: background .2s;
+    align-self: center;
+  }
+  .sync-dot.ok      { background: #34d399; box-shadow: 0 0 6px rgba(52,211,153,.5); }
+  .sync-dot.syncing { background: #fbbf24; animation: pulse 1.2s ease-in-out infinite; }
+  .sync-dot.error   { background: #f87171; }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: .35; }
+  }
+
+  /* Calculator launch button on the top bar */
+  .topbar-action {
+    background: transparent;
+    color: rgba(255,255,255,.88);
+    padding: 0 14px;
+    border-left: 1px solid rgba(255,255,255,.12);
+    font-size: 14px;
+    display: inline-flex; align-items: center; gap: 6px;
+    flex-shrink: 0;
+    transition: background .12s;
+  }
+  .topbar-action:hover { background: rgba(255,255,255,.08); }
+  .topbar-action.active { background: var(--accent); color: white; }
+  .topbar-action svg { width: 16px; height: 16px; }
+
+  /* Floating draggable calculator — keyboard-driven, no total */
+  .calc-window {
+    position: fixed;
+    width: 320px;
+    background: var(--s1);
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(26,24,53,.22), 0 2px 6px rgba(26,24,53,.1);
+    border: 1px solid var(--bd);
+    z-index: 200;
+    display: none;
+    user-select: none;
+  }
+  .calc-window.open { display: block; }
+  .calc-header {
+    background: var(--accent); color: white;
+    padding: 8px 12px;
+    border-radius: 12px 12px 0 0;
+    cursor: move;
+    display: flex; justify-content: space-between; align-items: center;
+    font-weight: 600; font-size: 13px;
+    touch-action: none;
+  }
+  .calc-header .calc-close {
+    color: rgba(255,255,255,.85); font-size: 18px; line-height: 1;
+    width: 24px; height: 24px; border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: transparent;
+  }
+  .calc-header .calc-close:hover { background: rgba(255,255,255,.18); }
+  .calc-display {
+    padding: 10px 12px;
+    display: flex; align-items: baseline; gap: 8px;
+    border-bottom: 1px solid var(--bd);
+    user-select: auto;
+  }
+  .calc-display input {
+    flex: 1; min-width: 0;
+    padding: 7px 10px;
+    border: 1px solid var(--bd); border-radius: 6px;
+    font-family: var(--font-mono);
+    font-size: 14px;
+    font-variant-numeric: tabular-nums;
+    background: white; color: var(--text);
+  }
+  .calc-display input:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1.5px var(--accent);
+  }
+  .calc-display .calc-live {
+    color: var(--accent);
+    font-weight: 700;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    min-width: 70px;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  .calc-display .calc-live.error { color: var(--muted); font-weight: 400; }
+  .calc-list {
+    max-height: 200px; overflow-y: auto;
+    margin: 8px 12px 0;
+    font-family: var(--font-mono); font-size: 12px;
+    border: 1px solid var(--bd); border-radius: 6px;
+    background: var(--s2);
+    user-select: auto;
+  }
+  .calc-row {
+    display: grid; grid-template-columns: 1fr auto 22px;
+    align-items: center; padding: 4px 8px; gap: 8px;
+    border-bottom: 1px solid var(--bd);
+  }
+  .calc-row:last-child { border-bottom: 0; }
+  .calc-row .expr { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .calc-row .result { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; color: var(--text); }
+  .calc-row .del { color: var(--muted); font-size: 14px; background: transparent; }
+  .calc-row .del:hover { color: var(--red); }
+  .calc-empty { padding: 14px; text-align: center; color: var(--muted); font-size: 12px; }
+  .calc-actions { display: flex; gap: 6px; padding: 8px 12px 12px; }
+  .calc-actions button {
+    flex: 1; padding: 6px; border-radius: 6px; background: var(--s2); color: var(--muted); font-size: 12px;
+  }
+  .calc-actions button:hover { background: var(--accent-soft); color: var(--accent); }
+
+  /* Tabs */
+  .tabs {
+    display: flex; background: var(--s1); border-bottom: 1px solid var(--bd);
+    position: sticky; top: 0; z-index: 5;
+    align-items: stretch;
+  }
+  .tab {
+    flex: 1; padding: 12px 6px; text-align: center;
+    color: var(--muted); font-weight: 600;
+    position: relative;
+    transition: color .12s ease;
+    font-size: 13px;
+  }
+  .tab.active { color: var(--accent-text); font-weight: 700; }
+  .tab.active::after {
+    content: ""; position: absolute; left: 22%; right: 22%; bottom: 0;
+    height: 3px; border-radius: 3px 3px 0 0;
+    background: var(--grad-accent);
+  }
+  .tab.hidden-tab { display: none; }
+  /* Settings cog at end of tabs row */
+  .tab-cog {
+    flex-shrink: 0;
+    padding: 0 14px;
+    color: var(--muted);
+    border-bottom: 3px solid transparent;
+    background: transparent;
+    font-size: 14px;
+  }
+  .tab-cog:hover { color: var(--accent); }
+  .tab-settings-pop {
+    position: absolute; right: 8px; top: 90px;
+    background: var(--s1); border: 1px solid var(--bd);
+    border-radius: 8px; padding: 8px;
+    box-shadow: 0 4px 16px rgba(26,24,53,.18);
+    z-index: 80;
+    min-width: 160px;
+    display: none;
+  }
+  .tab-settings-pop.show { display: block; }
+  .tab-settings-pop label {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 8px; border-radius: 4px;
+    font-size: 12.5px; cursor: pointer;
+  }
+  .tab-settings-pop label:hover { background: var(--s2); }
+  .tab-settings-pop .settings-group-label {
+    font-size: 10px; text-transform: uppercase; letter-spacing: .05em;
+    color: var(--muted); padding: 6px 8px 2px;
+    font-weight: 700;
+  }
+  .tab-settings-pop .settings-divider {
+    height: 1px; background: var(--bd); margin: 6px 4px;
+  }
+  .tab-settings-pop .settings-btn {
+    display: block; width: 100%; text-align: left;
+    padding: 6px 8px; border-radius: 4px;
+    background: transparent; color: var(--text);
+    font-size: 12.5px; cursor: pointer;
+  }
+  .tab-settings-pop .settings-btn:hover { background: var(--accent-soft); color: var(--accent); }
+
+  .content { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 10px; padding-bottom: 20px; }
+  .pane { display: none; }
+  .pane.active { display: block; }
+
+  /* Section card (collapsible) — Studio treatment: floating card, accent dot + serif title */
+  .section {
+    background: var(--s1); border: 1px solid var(--bd); border-radius: 12px;
+    box-shadow: var(--shadow); margin-bottom: 8px; overflow: visible;
+  }
+  .section-head {
+    background: transparent; color: var(--text);
+    padding: 7px 12px 5px; font-weight: 700; font-size: 13px;
+    display: flex; justify-content: space-between; align-items: center;
+    cursor: pointer; user-select: none;
+    border-radius: 12px 12px 0 0;
+    gap: 10px;
+  }
+  .section-head .title-area {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    flex: 1; min-width: 0;
+  }
+  /* Accent dot marker before the title (replaces the old solid lavender head fill) */
+  .section-head .title-area::before {
+    content: ""; width: 5px; height: 5px; border-radius: 50%;
+    background: var(--accent); flex-shrink: 0;
+  }
+  /* Section title — Fraunces */
+  .section-head .title-area > span:first-of-type,
+  .person-chip.as-title {
+    font-family: var(--font-display);
+    font-size: 14px; font-weight: 600; letter-spacing: -0.2px;
+    color: var(--text);
+  }
+  .section-head .head-right {
+    display: flex; align-items: center; gap: 9px;  /* equal spacing: counter ↔ + ↔ arrow */
+    flex-shrink: 0;
+  }
+  /* Counter pill — mono, next to the title */
+  .section-head .meta {
+    font-family: var(--font-mono);
+    background: var(--s2);
+    border: 1px solid var(--bd);
+    color: var(--muted);
+    padding: 1px 7px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 500;
+    line-height: 1.4;
+    box-shadow: var(--bevel-soft);
+  }
+  /* Reset button in the Cadence section head */
+  .section-head .copybtn {
+    background: var(--s1); border: 1px solid var(--bd); border-radius: 8px;
+    color: var(--text); font-weight: 700;
+    box-shadow: var(--bevel-soft);
+    transition: background .12s, transform .1s;
+  }
+  .section-head .copybtn:hover { background: var(--s2); }
+  .section-head .copybtn:active { transform: scale(0.95); }
+  /* Chevron — same size as the + button, on the far right */
+  .section-head .chev {
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    background: var(--s2);
+    color: var(--muted);
+    font-size: 11px;
+    display: inline-flex; align-items: center; justify-content: center;
+    transition: background .12s, color .12s, transform .15s;
+    flex-shrink: 0;
+  }
+  .section-head:hover .chev { background: var(--accent-soft); color: var(--accent); }
+  .section.collapsed .section-head { border-radius: 12px; padding-bottom: 7px; }
+  .section.collapsed .chev { transform: rotate(-90deg); }
+  .section.collapsed .section-body, .section.collapsed .add-row { display: none; }
+  .section-body { padding: 2px 8px 7px; }
+
+  /* Person chip + hover popover */
+  .person-chip {
+    position: relative;
+    display: inline-flex; align-items: center;
+    background: var(--s1); color: var(--accent-text);
+    padding: 1px 8px; border-radius: 999px;
+    font-size: 11px; font-weight: 600;
+    border: 1px solid var(--bd);
+    box-shadow: var(--bevel-soft);
+    cursor: pointer;
+  }
+  .person-chip:hover { background: var(--accent-soft); }
+  .person-chip[data-rtl="true"] { direction: rtl; }
+  /* "Title-style" chip — for Eric: looks like the section title itself, hover still works */
+  .person-chip.as-title {
+    background: transparent;
+    border: 0;
+    padding: 0;
+    box-shadow: none;
+    color: var(--text);
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .person-chip.as-title:hover { background: transparent; }
+  .person-popover {
+    opacity: 0; visibility: hidden; pointer-events: none;
+    position: absolute; top: calc(100% + 6px); left: 0;
+    background: var(--s1); color: var(--text);
+    border: 1px solid var(--bd); border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(26,24,53,.18);
+    padding: 10px 12px; z-index: 50;
+    min-width: 280px; max-width: 380px;
+    font-size: 12px; font-weight: 400;
+    direction: ltr;
+    white-space: nowrap;
+    /* Hide after a delay so the cursor can travel chip → popover without it vanishing */
+    transition: opacity .15s ease .5s, visibility 0s linear .65s;
+  }
+  /* Invisible "bridge" between chip and popover so the hover gap doesn't break it */
+  .person-popover::before {
+    content: ""; position: absolute;
+    top: -10px; left: 0; right: 0; height: 10px;
+  }
+  .person-chip:hover .person-popover,
+  .person-chip:focus-within .person-popover {
+    opacity: 1; visibility: visible; pointer-events: auto;
+    transition: opacity .1s ease 0s, visibility 0s linear 0s;
+  }
+  .person-popover .p-name {
+    font-weight: 700; color: var(--text); margin-bottom: 6px; font-size: 13px;
+    padding: 2px 4px; border-radius: 3px;
+  }
+  .person-popover .p-row {
+    display: grid; grid-template-columns: 60px 1fr;
+    gap: 6px; padding: 2px 0; align-items: baseline;
+  }
+  .person-popover .p-row .lbl { color: var(--muted); }
+  .person-popover .p-row .val { word-break: normal; min-width: 0; }
+  .person-popover .p-row .val.copyable {
+    cursor: pointer;
+    padding: 1px 4px; border-radius: 3px;
+    transition: background .12s;
+  }
+  .person-popover .p-row .val.copyable:hover { background: var(--accent-soft); color: var(--accent); }
+
+  /* Header block — title row on top, notes stacked one per line below */
+  /* Pill style — every Daily block is its own bordered card */
+  .hblock {
+    padding: 4px 8px; margin: 4px 0;
+    border-radius: 8px;
+    border: 1px solid var(--bd);
+    background: var(--s1);
+    box-shadow: var(--bevel-soft);
+    transition: background .12s, border-color .12s, box-shadow .12s, opacity .12s;
+  }
+  .hblock:hover { background: var(--s2); border-color: var(--accent); }
+  /* Drag-to-reorder visuals */
+  .hblock.dragging   { opacity: .35; }
+  .hblock.drag-over  { outline: 2px dashed var(--accent); outline-offset: 2px; }
+  .hblock-drag-handle {
+    cursor: grab;
+    color: var(--muted);
+    padding: 0 4px;
+    font-size: 13px;
+    line-height: 1;
+    user-select: none;
+    opacity: 0;
+    transition: opacity .12s, color .12s;
+    flex-shrink: 0;
+    align-self: center;
+  }
+  .hblock:hover .hblock-drag-handle { opacity: 1; }
+  .hblock-drag-handle:hover { color: var(--accent); }
+  .hblock-drag-handle:active { cursor: grabbing; }
+
+  /* Note reorder — Studio ⠿ grab handle. Pointer-based drag: works with mouse AND touch. */
+  .note-grab {
+    cursor: grab;
+    color: var(--muted);
+    padding: 0 3px;
+    font-size: 10px;
+    line-height: 1;
+    user-select: none; -webkit-user-select: none;
+    touch-action: none;             /* lets pointermove fire on iOS instead of scrolling */
+    opacity: 0;
+    transition: opacity .12s, color .12s;
+    flex-shrink: 0;
+    align-self: center;
+  }
+  .note-body:hover .note-grab { opacity: .55; }
+  .note-grab:hover { color: var(--accent); opacity: 1 !important; }
+  .note-grab:active { cursor: grabbing; }
+  body.is-mobile .note-grab { opacity: .45; }
+  .note-inline.dragging  { opacity: .3; }
+  .note-inline.drag-over {
+    background: var(--accent-soft);
+    box-shadow: 0 0 0 2px var(--accent) inset;
+  }
+  /* Header row = swipe wrapper too (iPhone: swipe left → Edit + Delete whole block) */
+  .hblock-head {
+    position: relative; overflow: hidden;
+    border-radius: 6px;
+  }
+  .hblock-toprow {
+    display: flex; align-items: center; gap: 5px;
+    font-size: 12.5px; line-height: 1.45;
+    position: relative;
+    width: 100%; min-width: 100%;
+    transition: transform .16s cubic-bezier(.2,.8,.3,1);
+    touch-action: pan-y;
+    cursor: pointer;              /* click the line to fold/unfold the notes */
+    user-select: none; -webkit-user-select: none;
+  }
+  /* Collapse state — notes hidden, tiny chev rotates, note-count pill appears */
+  .hblock.collapsed .hblock-notes { display: none; }
+  .hblock-chev {
+    font-size: 9px; color: var(--muted); opacity: .55;
+    flex-shrink: 0; align-self: center;
+    transition: transform .15s;
+  }
+  .hblock.collapsed .hblock-chev { transform: rotate(-90deg); }
+  .hblock-count {
+    font-family: var(--font-mono);
+    font-size: 9.5px; line-height: 1.4;
+    padding: 0 6px; border-radius: 999px;
+    background: var(--s2); border: 1px solid var(--bd); color: var(--muted);
+    box-shadow: var(--bevel-soft);
+    flex-shrink: 0; align-self: center;
+  }
+  body.is-mobile .hblock-toprow {
+    background: var(--s1);           /* opaque: covers the swipe buttons behind */
+    padding-top: 4px; padding-bottom: 4px;
+  }
+  .hblock.rtl .hblock-toprow { direction: rtl; }
+  .hblock-title {
+    font-weight: 700; color: var(--accent-text);
+    padding: 1px 4px; border-radius: 3px;
+    outline: none; min-width: 0;
+    overflow-wrap: anywhere;
+    cursor: default;
+  }
+  .hblock-title[data-rtl="true"] { direction: rtl; }
+  /* Notes stack — each note on its own line under the title */
+  .hblock-notes {
+    display: flex; flex-direction: column;
+    margin: 1px 0 0; padding-inline-start: 12px;
+    font-size: 12px; line-height: 1.45;
+  }
+  .hblock.rtl .hblock-notes { direction: rtl; }
+  /* Note row = swipe wrapper. Actions sit behind; the body slides over them (iPhone). */
+  .note-inline {
+    position: relative; overflow: hidden;
+    border-radius: 6px;
+  }
+  /* Per-note direction: a Hebrew note flips its own row, dash included */
+  .note-inline[data-rtl="true"] { direction: rtl; }
+  .note-actions {
+    display: none;                   /* shown only while a swipe is in progress/open */
+    position: absolute; top: 0; right: 0; bottom: 0; width: 112px;
+  }
+  body.is-mobile .swipe-active > .note-actions { display: flex; }  /* note rows AND header rows */
+  .note-swipe-btn {
+    flex: 1; border: 0; color: white;
+    font-size: 11px; font-weight: 700;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.22);
+  }
+  .note-swipe-btn.edit { background: var(--grad-accent); }
+  .note-swipe-btn.del  { background: var(--grad-red); }
+
+  /* Mac row actions — small colored square buttons, appear on hover (Studio style):
+     blue pencil = edit, red × = delete. Text itself is read-only until Edit is pressed. */
+  .note-act {
+    width: 19px; height: 19px; border-radius: 6px;
+    display: inline-flex; align-items: center; justify-content: center;
+    color: white; font-size: 12px; line-height: 1;
+    flex-shrink: 0; align-self: center;
+    opacity: 0; transition: opacity .12s, transform .1s, filter .12s;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.3), 0 1px 3px rgba(26,24,53,.18);
+  }
+  .note-act.edit { background: var(--grad-accent); }
+  .note-act.del  { background: var(--grad-red); }
+  .note-act:hover { filter: brightness(1.1); }
+  .note-act:active { transform: scale(0.9); }
+  .note-body:hover .note-act,
+  .hblock-toprow:hover .note-act { opacity: 1; }
+  body.is-mobile .note-act { display: none; }               /* mobile: swipe instead */
+  body.is-mobile .hblock-toprow .note-act.edit {            /* …except the title pencil */
+    display: inline-flex; opacity: .45;
+  }
+  .toprow-gap { flex: 1; }
+  .note-body {
+    position: relative;
+    display: flex; align-items: baseline; gap: 2px;
+    padding: 1px 4px; border-radius: 6px;
+    width: 100%; min-width: 100%;
+    transition: transform .16s cubic-bezier(.2,.8,.3,1);
+    touch-action: pan-y;             /* vertical scroll stays native; we handle horizontal */
+  }
+  body.is-mobile .note-body {
+    background: var(--s1);           /* opaque: covers the delete button behind */
+    padding-top: 6px; padding-bottom: 6px;   /* comfortable tap target */
+  }
+  .note-body::before {
+    content: "–"; color: var(--muted); opacity: .5;
+    margin-inline-end: 5px; pointer-events: none; flex-shrink: 0;
+  }
+  /* The note text stretches across the whole row. Read-only until Edit is pressed. */
+  .ntext {
+    flex: 1; min-width: 0;
+    padding: 1px 4px; border-radius: 3px; outline: none;
+    word-break: break-word; overflow-wrap: anywhere;
+    cursor: default;
+  }
+  .ntext[data-rtl="true"] { direction: rtl; }
+  /* Empty note → ghost placeholder instead of a tiny bare pill */
+  .ntext:empty::before {
+    content: attr(data-ph);
+    color: var(--muted); opacity: .55;
+    pointer-events: none;
+  }
+  /* iOS zoom fix: Safari auto-zooms when a focused editable is under 16px.
+     Edit mode is entered BEFORE focus, so bumping the size here prevents the zoom. */
+  body.is-mobile .ntext[contenteditable="true"],
+  body.is-mobile .hblock-title[contenteditable="true"] {
+    font-size: 16px;
+  }
+  /* Ghost add-rows — the personal dashboard's "+ Add item" pattern.
+     A full-width tappable line instead of tiny + circles. */
+  .add-ghost {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 11.5px; font-weight: 600; text-align: start;
+    color: var(--muted);
+    background: transparent;
+    border-radius: 6px;
+    transition: color .12s, background .12s, border-color .12s;
+  }
+  .add-ghost:hover { color: var(--accent); background: var(--accent-soft); }
+  /* Note-level: quiet indented line inside the block ("+ note") */
+  .add-note-ghost {
+    padding: 1px 4px; margin-top: 1px;
+    opacity: .55;
+  }
+  .add-note-ghost:hover { opacity: 1; }
+  body.is-mobile .add-note-ghost { padding-top: 5px; padding-bottom: 5px; opacity: .7; }
+
+  /* 3D "＋ Header" button in the section head — Studio gradient + bevel + press scale */
+  .add-header-btn {
+    background: var(--grad-accent); color: white;
+    font-size: 10.5px; font-weight: 700; line-height: 1;
+    padding: 5px 10px; border-radius: 999px;
+    box-shadow: var(--bevel-accent);
+    flex-shrink: 0;
+    transition: filter .12s, transform .1s;
+  }
+  .add-header-btn:hover { filter: brightness(1.08); }
+  .add-header-btn:active { transform: scale(0.94); }
+  .icon-btn {
+    width: 22px; height: 22px; border-radius: 50%;
+    color: var(--muted); display: inline-flex; align-items: center; justify-content: center;
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+  .icon-btn:hover { background: var(--s3); color: var(--text); }
+
+  .add-row {
+    display: flex; gap: 8px; padding: 6px 10px;
+    color: var(--muted); font-size: 12px;
+  }
+  .add-row button {
+    padding: 4px 10px; border-radius: 14px; background: var(--s2); color: var(--muted);
+  }
+  .add-row button:hover { background: var(--accent-soft); color: var(--accent); }
+
+  /* Info — bank cards (compact) */
+  .icard {
+    background: var(--s1); border: 1px solid var(--bd); border-radius: 14px;
+    box-shadow: var(--shadow);
+    padding: 10px 12px; margin-bottom: 10px;
+    display: flex; flex-direction: column; gap: 2px;
+  }
+  .icard h3 {
+    font-family: var(--font-display);
+    color: var(--text); font-size: 14.5px; font-weight: 600;
+    letter-spacing: -0.2px; margin-bottom: 4px;
+  }
+  .icard h3[contenteditable]:focus { background: var(--accent-soft); border-radius: 3px; outline: none; }
+  .icard .row { display: flex; justify-content: space-between; gap: 8px; font-size: 12.5px; padding: 1px 0; border-bottom: 1px dashed var(--bd); }
+  .icard .row:last-of-type { border-bottom: 0; }
+  .icard .row .lbl { color: var(--muted); flex-shrink: 0; }
+  .icard .row .lbl[contenteditable]:focus { background: var(--accent-soft); border-radius: 3px; outline: none; }
+  .icard .row .val { font-weight: 600; font-variant-numeric: tabular-nums; text-align: right; word-break: break-word; min-width: 0; }
+  /* Hebrew text inside the value renders RTL via Unicode bidi while flex layout stays LTR */
+  .icard .row .val .dbl-edit { unicode-bidi: isolate; }
+  .icard .row .val .copybtn {
+    margin-left: 6px; padding: 1px 6px; border-radius: 4px;
+    font-size: 10px; background: var(--s2); color: var(--muted); font-weight: 500;
+  }
+  .icard .row .val .copybtn:hover { background: var(--accent-soft); color: var(--accent); }
+  .icard .row .row-del { opacity: 0; transition: opacity .12s; }
+  .icard .row:hover .row-del { opacity: 1; }
+  /* Delete-row button (used in editable Info rows + procedures) */
+  .row-del {
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    color: var(--muted);
+    font-size: 14px; line-height: 1;
+    display: inline-flex; align-items: center; justify-content: center;
+    margin-left: 4px;
+    flex-shrink: 0;
+  }
+  .row-del:hover { background: var(--red-bg); color: var(--red); }
+  /* Inline contenteditable focus state */
+  /* Generic contenteditable focus — overridden by .dbl-edit and .ntext rules above */
+  [contenteditable]:focus { outline: none; }
+
+  /* Editable pill — read-only by default, double-click to edit, grows with content */
+  .dbl-edit {
+    cursor: pointer;
+    outline: none;
+    border-radius: 4px;
+    padding: 1px 6px;
+    margin: -1px -6px;
+    transition: background .12s, box-shadow .12s;
+    display: inline-block;
+    max-width: 100%;
+    word-break: break-word;
+  }
+  .dbl-edit:hover { background: var(--s2); }
+  .dbl-edit[contenteditable="true"] {
+    background: var(--s1);
+    box-shadow: 0 0 0 1.5px var(--accent), 0 1px 3px rgba(91,79,207,.18);
+    cursor: text;
+  }
+  /* Notes and headers — read-only by default; purple ring only while in edit mode */
+  .ntext, .hblock-title {
+    border-radius: 4px;
+    padding: 1px 6px;
+    margin: -1px -6px;
+    transition: background .12s, box-shadow .12s;
+  }
+  .ntext.editing, .hblock-title.editing {
+    background: var(--s1) !important;
+    box-shadow: 0 0 0 1.5px var(--accent), 0 1px 3px rgba(91,79,207,.18);
+    outline: none;
+    cursor: text;
+    user-select: text; -webkit-user-select: text;  /* toprow is user-select:none */
+  }
+
+  /* Card head with inline + Add button */
+  .icard-head {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 4px; gap: 8px;
+  }
+  .icard-head h3 { margin: 0; }
+  .icard-add {
+    width: 20px; height: 20px; border-radius: 50%;
+    background: var(--grad-accent); color: white;
+    font-size: 13px; font-weight: 600; line-height: 1;
+    display: inline-flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    box-shadow: var(--bevel-accent);
+    transition: filter .12s, transform .1s;
+  }
+  .icard-add:hover { filter: brightness(1.08); }
+  .icard-add:active { transform: scale(0.92); }
+
+  .contact-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 2px 0; font-size: 12.5px;
+    border-bottom: 1px dashed var(--bd);
+    flex-wrap: nowrap;
+    white-space: nowrap;
+  }
+  .contact-row:last-child { border-bottom: 0; }
+  .contact-row .role { color: var(--muted); flex-shrink: 0; min-width: 130px; }
+  /* Override the global .dbl-edit word-break so contact names/roles stay on one line */
+  .contact-row .dbl-edit { word-break: normal; white-space: nowrap; }
+  .contact-row .role[contenteditable]:focus { background: var(--accent-soft); border-radius: 3px; }
+  .contact-row .name-block {
+    display: flex; align-items: baseline; gap: 12px; min-width: 0;
+    font-weight: 500;
+  }
+  /* Reset the global .dbl-edit negative margin inside contact rows so the
+     hover/edit halo doesn't bleed onto the adjacent name or phone pill. */
+  .contact-row .role,
+  .contact-row .name-block .he,
+  .contact-row .name-block .en,
+  .contact-row .phone {
+    margin: 0;
+  }
+  .contact-row .name-block .he {
+    direction: rtl; outline: none;
+    padding: 0 3px; border-radius: 3px;
+  }
+  .contact-row .name-block .he:focus { background: var(--accent-soft); }
+  .contact-row .name-block .en {
+    color: var(--muted); font-size: 11px;
+    outline: none; padding: 0 3px; border-radius: 3px;
+  }
+  .contact-row .name-block .en:focus { background: var(--accent-soft); color: var(--text); }
+  /* Optional phone: visible only when populated; otherwise a hover-only "+" pill to add it */
+  .contact-row .phone {
+    color: var(--accent);
+    font-size: 11px;
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    padding: 1px 6px;
+    border-radius: 10px;
+    background: var(--accent-soft);
+    direction: ltr; unicode-bidi: isolate;
+  }
+  .contact-row .add-phone {
+    font-size: 10px;
+    padding: 1px 8px;
+    border-radius: 10px;
+    background: var(--s2);
+    color: var(--muted);
+    opacity: 0;
+    transition: opacity .12s;
+    flex-shrink: 0;
+  }
+  .contact-row:hover .add-phone { opacity: 0.6; }
+  .contact-row .add-phone:hover { opacity: 1; background: var(--accent-soft); color: var(--accent); }
+  .contact-row .row-del { opacity: 0; transition: opacity .12s; }
+  .contact-row:hover .row-del { opacity: 1; }
+
+  /* Drag handle for reordering procedure cards */
+  .proc-drag-handle {
+    cursor: grab;
+    color: var(--muted);
+    font-size: 14px; line-height: 1;
+    padding: 0 6px;
+    user-select: none;
+    opacity: 0;
+    transition: opacity .12s, color .12s;
+    flex-shrink: 0;
+  }
+  .proc-bubble:hover .proc-drag-handle { opacity: 1; }
+  .proc-drag-handle:hover { color: var(--accent); }
+  .proc-drag-handle:active { cursor: grabbing; }
+  .proc-bubble.dragging { opacity: .4; }
+  .proc-bubble.drag-over { outline: 2px dashed var(--accent); outline-offset: 2px; }
+
+  /* Procedure bubbles — collapsible */
+  .proc-bubble {
+    background: var(--s1); border: 1px solid var(--bd); border-radius: 14px;
+    box-shadow: var(--shadow);
+    margin-bottom: 8px; overflow: hidden;
+  }
+  .proc-bubble-head {
+    padding: 10px 14px;
+    background: transparent; color: var(--accent-text);
+    font-weight: 600; cursor: pointer;
+    display: flex; justify-content: space-between; align-items: center;
+    direction: rtl; gap: 8px;
+  }
+  .proc-bubble-head:hover { background: var(--s2); }
+  .proc-bubble-head .chev { transition: transform .15s ease; direction: ltr; color: var(--muted); }
+  .proc-bubble.expanded .proc-bubble-head .chev { transform: rotate(90deg); }
+  .proc-bubble-body {
+    display: none;
+    padding: 12px 16px;
+    font-size: 13px; line-height: 1.6;
+    direction: rtl; text-align: right;
+    color: var(--text);
+    /* Preserve newlines and leading spaces typed by the user */
+    white-space: pre-wrap;
+    word-wrap: break-word;
+  }
+  .proc-bubble.expanded .proc-bubble-body { display: block; }
+
+  /* Cadence */
+  .cad-meta {
+    background: var(--s1); border-radius: 10px; padding: 10px 14px; margin-bottom: 12px;
+    box-shadow: var(--shadow);
+  }
+  .cad-meta .row { display: flex; justify-content: space-between; align-items: center; }
+  .cad-item {
+    display: grid; grid-template-columns: 24px 1fr auto 24px;
+    align-items: center; gap: 8px;
+    padding: 6px 8px; margin-bottom: 4px;
+    font-size: 13px;
+    background: var(--s1); border: 1px solid var(--bd); border-radius: 8px;
+    box-shadow: var(--bevel-soft);
+  }
+  .cad-item.info { grid-template-columns: 1fr auto 28px; }
+  .cad-item.kv {
+    grid-template-columns: 1fr auto auto;
+    align-items: center;
+  }
+  .cad-item.kv .cad-name {
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    min-width: 0;
+  }
+  .cad-item.kv .kv-value {
+    background: var(--accent-soft); color: var(--accent-text);
+    padding: 2px 10px; border-radius: 999px;
+    font-family: var(--font-mono);
+    font-weight: 600; font-variant-numeric: tabular-nums;
+    font-size: 12px;
+    box-shadow: var(--bevel-soft);
+    outline: none;
+    /* Override conflicting .dbl-edit styles */
+    margin: 0;
+    display: inline-block;
+    max-width: none;
+    word-break: normal;
+    white-space: nowrap;
+  }
+  .cad-item.kv .kv-value:focus { background: white; box-shadow: 0 0 0 2px var(--accent); }
+  /* Pre-Payments expanded detail — smaller so the explanation fits one line */
+  .cad-item.kv .cad-detail { font-size: 11px; line-height: 1.4; padding: 6px 10px; white-space: nowrap; overflow-x: auto; }
+  /* Completed rows: strike + fade the name (status lives in the due pill, not the row bg) */
+  .cad-item.completed .cad-name { text-decoration: line-through; opacity: .5; }
+  .cad-checkbox {
+    width: 18px; height: 18px; border: 1.5px solid var(--bd); border-radius: 5px;
+    background: var(--s1); display: inline-flex; align-items: center; justify-content: center;
+    font-size: 12px; color: transparent;
+    transition: background .12s, border-color .12s;
+  }
+  .cad-checkbox:hover { border-color: var(--accent); }
+  .cad-item.completed .cad-checkbox {
+    background: var(--grad-accent); border-color: transparent; color: white;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.3);
+  }
+  .cad-name { font-weight: 500; cursor: pointer; }
+  .cad-name[contenteditable]:focus { outline: 1px solid var(--accent); border-radius: 4px; padding: 2px 4px; cursor: text; }
+  .cad-name[data-rtl="true"] { direction: rtl; text-align: right; }
+  /* Due-status pill: green = done, gradient accent = due today, gradient red = overdue */
+  .cad-due {
+    font-size: 11px; font-weight: 700;
+    padding: 2px 9px; border-radius: 999px;
+    background: var(--s2); color: var(--muted);
+    text-align: center; white-space: nowrap;
+    box-shadow: var(--bevel-soft);
+    justify-self: end;
+    font-variant-numeric: tabular-nums;
+  }
+  .cad-due.green { background: var(--green-bg); color: var(--green); }
+  .cad-due.amber {
+    background: var(--grad-accent); color: white;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.3), 0 1px 3px rgba(91,79,207,.3);
+  }
+  .cad-due.red {
+    background: var(--grad-red); color: white;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.3), 0 1px 3px rgba(220,38,38,.3);
+  }
+  .cad-lock { color: var(--muted); }
+  .cad-lock.locked { color: var(--accent); }
+  .cad-detail {
+    grid-column: 1 / -1;
+    margin-top: 6px; padding: 10px 12px; font-size: 13px; line-height: 1.55;
+    background: rgba(255,255,255,.7); border-radius: 6px;
+    color: var(--text);
+    display: none;
+    white-space: pre-wrap; word-wrap: break-word;
+  }
+  .cad-item.expanded .cad-detail { display: block; }
+  .cad-detail[data-rtl="true"] { direction: rtl; text-align: right; }
+
+  /* One focus ring for keyboard use */
+  button:focus-visible, .tab:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 2px;
+  }
+
+  /* Helpers */
+  .hidden { display: none !important; }
+  .small { font-size: 12px; }
+  .muted { color: var(--muted); }
+  .toast {
+    position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
+    background: var(--text); color: white; padding: 9px 16px; border-radius: 999px;
+    font-size: 13px; opacity: 0; transition: opacity .2s;
+    z-index: 100; pointer-events: none;
+    box-shadow: 0 8px 24px rgba(0,0,0,.25);
+  }
+  .toast.show { opacity: 1; }
+
+  /* Undo toast — replaces chrome confirm dialogs. Studio pill style. */
+  .undo-toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+    background: var(--text); color: white;
+    padding: 9px 10px 9px 16px; border-radius: 999px;
+    box-shadow: 0 8px 24px rgba(0,0,0,.28);
+    font-size: 12.5px;
+    display: flex; align-items: center; gap: 12px;
+    z-index: 200;
+    animation: slideUp .2s ease;
+    max-width: min(92vw, 420px);
+  }
+  .undo-toast span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .undo-toast button {
+    background: rgba(255,255,255,.2); color: white;
+    padding: 4px 13px; border-radius: 999px;
+    font-weight: 700; font-size: 11.5px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.18);
+    flex-shrink: 0;
+  }
+  .undo-toast button:hover { background: rgba(255,255,255,.3); }
+  .undo-toast button:active { transform: scale(0.95); }
+  @keyframes slideUp {
+    from { opacity: 0; transform: translate(-50%, 10px); }
+    to { opacity: 1; transform: translate(-50%, 0); }
+  }
+
+  /* Per-row direction (Hebrew → right, English → left) */
+  .contact-row.rtl { direction: rtl; }
+  .cad-item.rtl { direction: rtl; }
+
+  /* Inline highlight styles — bold red / bold black / strikethrough for marking names + done */
+  .hl-red { color: var(--red); font-weight: 700; }
+  .hl-black { color: var(--text); font-weight: 700; }
+  .hl-strike { text-decoration: line-through; opacity: 0.55; }
+
+  /* Floating format toolbar — appears on text selection inside Daily / Guberman */
+  .format-toolbar {
+    position: fixed;
+    background: var(--text); color: white;
+    padding: 4px; border-radius: 8px;
+    display: none; gap: 2px;
+    box-shadow: 0 4px 16px rgba(0,0,0,.32);
+    z-index: 300;
+    user-select: none;
+  }
+  .format-toolbar.show { display: inline-flex; }
+  .format-toolbar button {
+    width: 28px; height: 26px;
+    display: inline-flex; align-items: center; justify-content: center;
+    border-radius: 4px;
+    cursor: pointer;
+    background: transparent;
+    font-size: 13px; font-weight: 700;
+  }
+  .format-toolbar button:hover { background: rgba(255,255,255,.18); }
+  .format-toolbar .red { color: #FF6B6B; }
+  .format-toolbar .black { color: white; }
+  .format-toolbar .clear { color: rgba(255,255,255,.6); font-weight: 400; font-size: 16px; }
 </style>
 </head>
 <body>
 
+<!-- ── Passcode gate (runs BEFORE the app script) ─────────────────────────
+     The keyed API URL lives only as an AES-256-GCM blob; the passcode
+     decrypts it into localStorage and reloads so the app boots synced.
+     If the URL is already stored, the overlay is removed instantly. -->
 <div id="gate">
-  <form class="card" id="card" onsubmit="return go(event)">
-    <div class="mark">
-      <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-        <path d="M28 52 L44 68 L72 34" stroke="white" stroke-width="10" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-    </div>
-    <h1>ToDo</h1>
-    <div id="body">
-      <p>Enter your passcode to open the dashboard on this device.</p>
-      <input id="pw" type="password" inputmode="text" autocomplete="current-password" placeholder="passcode" autofocus>
-      <button type="submit">Unlock</button>
-      <div class="hint">Remembered on this device after first unlock</div>
-    </div>
-  </form>
+<style>
+  #gate { position: fixed; inset: 0; z-index: 9999; background: var(--bg);
+    display: grid; place-items: center; padding: 24px; }
+  .gate-card { width: 340px; max-width: 100%; text-align: center; background: var(--s1);
+    border: 1px solid var(--bd); border-radius: 16px; padding: 36px 30px 26px;
+    box-shadow: 0 1px 2px rgba(26,24,53,.05), 0 4px 16px rgba(26,24,53,.07); }
+  .gate-card.shake { animation: gateShake .4s; }
+  @keyframes gateShake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-8px); } 75% { transform: translateX(8px); } }
+  .gate-mark { width: 54px; height: 54px; border-radius: 16px; margin: 0 auto 14px;
+    background: var(--grad-accent); box-shadow: var(--bevel-accent);
+    display: grid; place-items: center; }
+  .gate-mark svg { width: 28px; height: 28px; }
+  .gate-card h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.3px; margin: 0 0 6px; }
+  .gate-card p { color: var(--muted); font-size: 13px; margin: 0 0 20px; line-height: 1.5; }
+  .gate-card input { width: 100%; box-sizing: border-box; font-size: 20px; text-align: center;
+    letter-spacing: 6px; padding: 12px; border: 1px solid var(--bd); border-radius: 10px;
+    outline: none; background: var(--bg); margin-bottom: 12px; color: var(--text);
+    font-family: var(--font-mono); }
+  .gate-card input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(91,79,207,.12); }
+  .gate-card input.err { border-color: var(--red); background: var(--red-bg); }
+  .gate-card button { width: 100%; padding: 12px; font-size: 14px; font-weight: 600; color: #fff;
+    border: none; border-radius: 10px; cursor: pointer;
+    background: var(--grad-accent); box-shadow: var(--bevel-accent); }
+  .gate-card button:active { transform: scale(0.97); }
+  .gate-hint { font-size: 10px; color: var(--muted); letter-spacing: .8px; text-transform: uppercase;
+    margin-top: 16px; font-family: var(--font-mono); }
+</style>
+<form class="gate-card" id="gate-card" onsubmit="return __gateGo(event)">
+  <div class="gate-mark">
+    <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+      <path d="M28 52 L44 68 L72 34" stroke="white" stroke-width="10" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </div>
+  <h1>ToDo</h1>
+  <p>Enter your passcode to unlock the dashboard on this device.</p>
+  <input id="gate-pw" type="password" inputmode="text" autocomplete="current-password" placeholder="passcode">
+  <button type="submit">Unlock</button>
+  <div class="gate-hint">Remembered on this device after first unlock</div>
+</form>
 </div>
-
 <script>
-// ── Encrypted vault ─────────────────────────────────────────────────────────
-// Holds the dashboard /exec URL (incl. access key) as an AES-256-GCM blob.
-// The passcode decrypts it; the page then NAVIGATES to the dashboard
-// (location.replace) — no iframe, so Google's frame-blocking headers on
-// script.google.com can't break anything.
-const VAULT = { salt: "tW5x0oo6HeMqRFVsSPQCeA==", iv: "e7s9W1qtYAFZ98hR", data: "njZM3oDSzdkpwID+C85pVhcmS/6qMgn010/pMXxyJUqhYHkhZqhHIfszDDngPI0WaP+42BHfAiC995wJOEmgYjEVqh/Ybt2vkVnBQrAO036v92sxtwHUiRqOl7LTmdpm3BxUJM1WU05yNDFVdrflPMeAGJ99zAimvCsrZBLfqNn6SrV1EHl9I+M64hu9s71drwPR6f61W1/MiUyod/KlQA8Yk0pRx5Bpfko7NVmI9gff7ZscxQ==" };
+const __GATE_VAULT = { salt: "tW5x0oo6HeMqRFVsSPQCeA==", iv: "e7s9W1qtYAFZ98hR", data: "njZM3oDSzdkpwID+C85pVhcmS/6qMgn010/pMXxyJUqhYHkhZqhHIfszDDngPI0WaP+42BHfAiC995wJOEmgYjEVqh/Ybt2vkVnBQrAO036v92sxtwHUiRqOl7LTmdpm3BxUJM1WU05yNDFVdrflPMeAGJ99zAimvCsrZBLfqNn6SrV1EHl9I+M64hu9s71drwPR6f61W1/MiUyod/KlQA8Yk0pRx5Bpfko7NVmI9gff7ZscxQ==" };
+const __GATE_LS = 'todo.exec.url.v2';
 
-// v2: bumped so devices that remembered the old (iframe-era) entry re-prompt once.
-const LS_KEY = 'todo.exec.url.v2';
+(function () {
+  // Legacy visitors can land here inside Google's wrapper iframe (old /exec
+  // bookmarks redirect within the frame). Script-driven top-navigation is
+  // blocked by Google's sandbox, but a user-tapped target="_top" link works.
+  if (window.top !== window.self) {
+    try { window.top.location.href = 'https://romanems.github.io/todo-dashboard/'; } catch (e) {}
+    document.getElementById('gate').innerHTML =
+      '<a href="https://romanems.github.io/todo-dashboard/" target="_top" class="gate-card" ' +
+      'style="display:block;text-decoration:none;color:inherit;font-size:16px;font-weight:600;">' +
+      'ToDo has moved to a new address.<br><br>' +
+      '<span style="color:#5B4FCF">Tap here to open it</span><br><br>' +
+      '<span style="font-size:12px;font-weight:400;color:#7874A8">Then delete the old home-screen icon and add this page instead.</span></a>';
+    return;
+  }
+  let saved = null;
+  try { saved = localStorage.getItem(__GATE_LS); } catch (e) {}
+  if (saved) document.getElementById('gate').remove();
+})();
 
-function b64d(s) { return Uint8Array.from(atob(s), c => c.charCodeAt(0)); }
+function __gateB64d(s) { return Uint8Array.from(atob(s), c => c.charCodeAt(0)); }
 
-async function deriveKey(pass, salt) {
-  const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(pass), 'PBKDF2', false, ['deriveKey']);
-  return crypto.subtle.deriveKey(
-    { name: 'PBKDF2', salt, iterations: 310000, hash: 'SHA-256' },
-    base, { name: 'AES-GCM', length: 256 }, false, ['decrypt']);
-}
-
-async function decryptVault(pass) {
-  const key = await deriveKey(pass, b64d(VAULT.salt));
-  const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b64d(VAULT.iv) }, key, b64d(VAULT.data));
-  return new TextDecoder().decode(plain);
-}
-
-// Standalone = launched from the home-screen icon. In a normal Safari tab we
-// deliberately DON'T auto-redirect: iOS takes the home-screen icon from the
-// page you're on when you tap "Add to Home Screen", so the branded gate page
-// must stay visible in Safari — otherwise you get Google's grey icon.
-const IS_STANDALONE = (navigator.standalone === true) ||
-  (window.matchMedia && matchMedia('(display-mode: standalone)').matches);
-
-let _url = null;
-
-function open_(url) {
-  document.getElementById('body').innerHTML = '<p class="opening">Opening the dashboard…</p>';
-  location.replace(url);
-}
-
-function showOpenCard() {
-  document.getElementById('body').innerHTML =
-    '<p>Unlocked on this device.</p>' +
-    '<button type="button" onclick="open_(_url)">Open dashboard</button>' +
-    '<div class="hint">Share → Add to Home Screen on THIS page<br>to install the app with its icon</div>';
-}
-
-async function go(e) {
+async function __gateGo(e) {
   e.preventDefault();
-  const pw = document.getElementById('pw');
+  const pw = document.getElementById('gate-pw');
   try {
-    _url = await decryptVault(pw.value);
-    try { localStorage.setItem(LS_KEY, _url); } catch (_) {}
-    if (IS_STANDALONE) open_(_url); else showOpenCard();
-  } catch (_) {
-    const card = document.getElementById('card');
+    const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(pw.value), 'PBKDF2', false, ['deriveKey']);
+    const key = await crypto.subtle.deriveKey(
+      { name: 'PBKDF2', salt: __gateB64d(__GATE_VAULT.salt), iterations: 310000, hash: 'SHA-256' },
+      base, { name: 'AES-GCM', length: 256 }, false, ['decrypt']);
+    const plain = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv: __gateB64d(__GATE_VAULT.iv) }, key, __gateB64d(__GATE_VAULT.data));
+    const url = new TextDecoder().decode(plain);
+    try { localStorage.setItem(__GATE_LS, url); } catch (e2) {}
+    window.location.reload();
+  } catch (e3) {
+    const card = document.getElementById('gate-card');
     pw.classList.add('err'); card.classList.add('shake');
     pw.value = '';
     setTimeout(() => { pw.classList.remove('err'); card.classList.remove('shake'); }, 500);
   }
   return false;
 }
+</script>
 
-// Boot: home-screen app + remembered → straight to the dashboard.
-// Safari tab + remembered → show the Open button (page stays for icon-adding).
-(function () {
-  let saved = null;
-  try { saved = localStorage.getItem(LS_KEY); } catch (_) {}
-  if (!saved) return;
-  _url = saved;
-  if (IS_STANDALONE) open_(saved); else showOpenCard();
+<div class="app">
+
+  <!-- Top bar: company strip + calculator action -->
+  <div class="topbar">
+    <div class="strip">
+      <div class="pair"><span class="lbl">ח.פ.</span><span class="val" data-key="hp"           title="Click to copy, double-click to edit"></span></div>
+      <div class="pair"><span class="lbl">תיק ניכויים</span><span class="val" data-key="tikNikuyim" title="Click to copy, double-click to edit"></span></div>
+      <div class="pair"><span class="lbl">ניהול ספרים</span><span class="val" id="bkPeriod" data-key="bkPeriod" title="Click to copy, double-click to edit"></span></div>
+      <div class="pair balance-pair" id="balancePair" style="display:none">
+        <span class="val" id="bankBalance" title="Latest push from cash flow"></span>
+      </div>
+    </div>
+    <span class="sync-dot syncing" id="syncDot" title="Connecting…"></span>
+    <button class="topbar-action" id="calcToggle" onclick="toggleCalcWindow()" title="Calculator (⌘K)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="4" y="2" width="16" height="20" rx="2"/>
+        <line x1="8" y1="6" x2="16" y2="6"/>
+        <line x1="8" y1="10" x2="8" y2="10"/><line x1="12" y1="10" x2="12" y2="10"/><line x1="16" y1="10" x2="16" y2="10"/>
+        <line x1="8" y1="14" x2="8" y2="14"/><line x1="12" y1="14" x2="12" y2="14"/><line x1="16" y1="14" x2="16" y2="14"/>
+        <line x1="8" y1="18" x2="8" y2="18"/><line x1="12" y1="18" x2="12" y2="18"/><line x1="16" y1="18" x2="16" y2="18"/>
+      </svg>
+      <span>Calc</span>
+    </button>
+  </div>
+
+  <!-- Floating draggable calculator -->
+  <div class="calc-window" id="calcWindow">
+    <div class="calc-header" id="calcHeader">
+      <span>Calculator <span class="small" style="opacity:.7; font-weight:400;">type · Enter</span></span>
+      <button class="calc-close" onclick="toggleCalcWindow()" title="Close">×</button>
+    </div>
+    <div class="calc-display">
+      <input type="text" id="calcExpr" placeholder="e.g. 100+50*2" autocomplete="off" spellcheck="false">
+      <span class="calc-live" id="calcLive"></span>
+    </div>
+    <div class="calc-list" id="calcList"></div>
+    <div class="calc-actions">
+      <button onclick="clearCalc()">Clear</button>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <nav class="tabs" role="tablist">
+    <button class="tab active" data-tab="daily">Daily</button>
+    <button class="tab" data-tab="info">Info</button>
+    <button class="tab" data-tab="cadence">Cadence</button>
+    <button class="tab-cog" onclick="toggleTabSettings()" title="Show / hide tabs">⚙</button>
+  </nav>
+
+  <main class="content">
+    <section class="pane active" id="pane-daily" data-pane="daily"></section>
+    <section class="pane" id="pane-info" data-pane="info"></section>
+    <section class="pane" id="pane-cadence" data-pane="cadence"></section>
+  </main>
+</div>
+
+<!-- Floating format toolbar — appears when you select text inside a Daily/Guberman note or header -->
+<div class="format-toolbar" id="formatToolbar">
+  <button class="red"   onmousedown="event.preventDefault(); applyHighlight('red')"    title="Bold red">B</button>
+  <button class="black" onmousedown="event.preventDefault(); applyHighlight('black')"  title="Bold black">B</button>
+  <button             onmousedown="event.preventDefault(); applyHighlight('strike')" title="Strike-through (mark done)" style="text-decoration: line-through; color: white;">S</button>
+  <button class="clear" onmousedown="event.preventDefault(); clearHighlight()"        title="Remove formatting">×</button>
+</div>
+
+<!-- Tab visibility settings popover -->
+<div class="tab-settings-pop" id="tabSettingsPop"></div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* =============================================================
+   ToDo Dashboard v1.2 — Tonkean palette, collapsible everywhere
+   Calculator pulled while we redesign it.
+============================================================= */
+
+// ---------- DATA ----------
+const DEFAULT_DATA = {
+  // v3: EMPTY skeleton, deliberately. This file is hosted in a public repo, so
+  // it must contain no real data — everything lives in the private Google
+  // Sheet and arrives via the keyed API after the passcode gate. The save
+  // guardrails (_serverLoaded) ensure this skeleton can never overwrite it.
+  activeTab: "daily",
+  hiddenTabs: [],
+  strip: { hp: "", tikNikuyim: "", bkPeriod: "" },
+  daily: {
+    sections: [
+      { id: "accounting", title: "Accounting", people: [], blocks: [] },
+      { id: "payroll",    title: "Payroll",    people: [], blocks: [] },
+      { id: "eric",       title: "Eric",       people: [], blocks: [] },
+      { id: "others",     title: "Others",     people: [], blocks: [] }
+    ],
+    sectionCollapsed: {},
+    blockCollapsed: {}   // blockId -> bool
+  },
+  info: {
+    banks: [],
+    contacts: { ey: [], legal: [] },
+    procedures: [],
+    procExpanded: {} // procId -> bool
+  },
+  cadence: {
+    sections: [],
+    completions: {},
+    collapsed: {}
+  }
+}
+
+// ---------- STATE ----------
+// Phase 2: localStorage is an offline cache. The Apps Script + Sheet backend
+// is the source of truth. Edits write to localStorage immediately for instant
+// feedback, then sync to the server with a 1.2s debounce.
+const STORAGE_KEY = "todo_dash_v1_5";
+let state = load();
+
+let _saveTimer = null;
+let _saveInFlight = false;
+let _saveAgain = false;
+const SAVE_DEBOUNCE_MS = 1200;
+
+// Guardrails added after a data-loss incident:
+// - Don't push local state to the server until we've successfully pulled
+//   from the server at least once. Otherwise stale localStorage from
+//   weeks ago can overwrite fresh Sheet data.
+// - Include the last-seen server timestamp on every save; if the server's
+//   current timestamp is newer (another device wrote in between), the
+//   server rejects the save and we force a refresh.
+let _serverLoaded = false;
+let _serverTimestamp = null;     // ISO string from getState() / saveState()
+let _pendingSaveAfterLoad = false; // true if save() was called before _serverLoaded
+let _loadRetryTimer = null;
+
+// v3 transport: the app is hosted on GitHub Pages; Apps Script is only its
+// JSON API. The keyed /exec URL is decrypted by the passcode gate on first
+// unlock and stored in localStorage — until then the app runs local-only
+// (and the gate overlay covers the screen anyway).
+const API_URL = (() => {
+  try { return localStorage.getItem("todo.exec.url.v2") || ""; } catch (e) { return ""; }
 })();
+
+function isServerEnabled() {
+  return !!API_URL;
+}
+
+// POST uses text/plain so the request stays "simple" (no CORS preflight,
+// which Apps Script cannot answer). Responses are JSON.
+async function apiFetch(action, body) {
+  const url = API_URL + "&action=" + action;
+  const opts = body === undefined
+    ? { method: "GET" }
+    : { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body };
+  const r = await fetch(url, opts);
+  if (!r.ok) throw new Error("HTTP " + r.status);
+  return r.json();
+}
+
+function load() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return structuredClone(DEFAULT_DATA);
+    const parsed = JSON.parse(raw);
+    return mergeDefaults(structuredClone(DEFAULT_DATA), parsed);
+  } catch (e) {
+    console.warn("Load failed, resetting:", e);
+    return structuredClone(DEFAULT_DATA);
+  }
+}
+function mergeDefaults(def, stored) {
+  const out = { ...def };
+  for (const k of Object.keys(stored || {})) out[k] = stored[k];
+  return out;
+}
+
+function save() {
+  // 1. Local cache (instant)
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) { /* ignore */ }
+  // 2. Server push — but ONLY after we've successfully loaded from server once.
+  //    Otherwise stale localStorage could overwrite a healthier Sheet (the bug
+  //    that lost weeks of data once).
+  if (!isServerEnabled()) return;
+  if (!_serverLoaded) {
+    _pendingSaveAfterLoad = true;
+    return;
+  }
+  if (_saveTimer) clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(pushToServer, SAVE_DEBOUNCE_MS);
+}
+
+// Fields that stay device-local: each device keeps its own copy in localStorage,
+// they're never pushed to the Sheet, and incoming server data doesn't overwrite them.
+// This lets you hide tabs on iPhone but show them on Mac, etc.
+const LOCAL_ONLY_FIELDS = ["hiddenTabs", "activeTab", "calcPos"];
+
+function buildSyncedPayload() {
+  const out = { ...state };
+  for (const f of LOCAL_ONLY_FIELDS) delete out[f];
+  return out;
+}
+
+function pushToServer() {
+  if (!isServerEnabled() || !_serverLoaded) return;
+  if (_saveInFlight) { _saveAgain = true; return; }
+  _saveInFlight = true;
+  setSyncIndicator("syncing");
+  apiFetch("saveState", JSON.stringify({
+    state: JSON.stringify(buildSyncedPayload()),
+    expectedTimestamp: _serverTimestamp
+  }))
+    .then(result => {
+      _saveInFlight = false;
+      // Conflict: server has newer data than what we'd loaded — another device
+      // wrote in between. Refuse to overwrite. Pull the newer data instead.
+      if (result && result.conflict) {
+        setSyncIndicator("error");
+        setSyncBanner(
+          "Newer data was found on the server (probably edited from another device). " +
+          "Refreshing now — any edit you just made may not have been saved. Re-do it on top of the fresh data."
+        );
+        loadFromServer();
+        return;
+      }
+      if (!result || result.ok !== true) throw new Error(result && result.error ? result.error : "save failed");
+      if (result.timestamp) _serverTimestamp = result.timestamp;
+      setSyncIndicator("ok");
+      setSyncBanner(null);
+      if (_saveAgain) { _saveAgain = false; pushToServer(); }
+    })
+    .catch(err => {
+      _saveInFlight = false;
+      setSyncIndicator("error");
+      setSyncBanner(
+        "Can't reach the server. Your edits are NOT being saved. " +
+        "Check your connection or refresh this page."
+      );
+      console.warn("Server save failed:", err);
+    });
+}
+
+function loadFromServer() {
+  if (!isServerEnabled()) return;
+  setSyncIndicator("syncing");
+  if (_loadRetryTimer) { clearTimeout(_loadRetryTimer); _loadRetryTimer = null; }
+  apiFetch("getState")
+    .then(result => {
+      const serverState = (result && typeof result === "object" && "state" in result) ? result.state : result;
+      const serverTs    = (result && typeof result === "object" && "timestamp" in result) ? result.timestamp : null;
+      _serverTimestamp = serverTs;
+
+      if (serverState) {
+        // Stash device-local prefs before we replace state
+        const localSnapshot = {};
+        for (const f of LOCAL_ONLY_FIELDS) {
+          if (state[f] !== undefined) localSnapshot[f] = state[f];
+        }
+        state = mergeDefaults(structuredClone(DEFAULT_DATA), serverState);
+        for (const f of LOCAL_ONLY_FIELDS) {
+          if (localSnapshot[f] !== undefined) state[f] = localSnapshot[f];
+        }
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
+        renderAll();
+        _serverLoaded = true;
+        setSyncIndicator("ok");
+        setSyncBanner(null);
+        // If save() was called before the server load completed, flush it now
+        if (_pendingSaveAfterLoad) { _pendingSaveAfterLoad = false; save(); }
+      } else {
+        // Server is empty (first run). Push local up to seed it — but only if
+        // we have meaningful local data.
+        const hasLocal = (state.daily?.sections?.length || 0) > 0
+          || (state.info?.banks?.length || 0) > 0
+          || (state.cadence?.sections?.length || 0) > 0;
+        _serverLoaded = true;
+        if (hasLocal) pushToServer();
+        else { setSyncIndicator("ok"); setSyncBanner(null); }
+      }
+    })
+    .catch(err => {
+      // CRITICAL: do NOT set _serverLoaded = true. Saves stay blocked until
+      // we actually pull from the server successfully. A red banner tells the
+      // user their edits aren't being saved.
+      setSyncIndicator("error");
+      setSyncBanner(
+        "Can't reach the server. Your edits are NOT being saved until this is fixed. " +
+        "Refresh the page or check your connection."
+      );
+      console.warn("Server load failed:", err);
+      // Auto-retry every 8 seconds in case it was a transient network blip.
+      if (_loadRetryTimer) clearTimeout(_loadRetryTimer);
+      _loadRetryTimer = setTimeout(loadFromServer, 8000);
+    });
+}
+
+function renderAll() {
+  renderStrip();
+  renderDaily();
+  renderInfo();
+  renderCadence();
+  applyTabHidden();
+  if (state.activeTab && document.querySelector(`.tab[data-tab="${state.activeTab}"]:not(.hidden-tab)`)) {
+    setActiveTab(state.activeTab);
+  }
+}
+
+function setSyncIndicator(status) {
+  const el = document.getElementById("syncDot");
+  if (!el) return;
+  el.classList.remove("ok", "syncing", "error");
+  el.classList.add(status);
+  el.title = status === "ok" ? "Synced" : status === "syncing" ? "Saving…" : "Sync error — check console";
+}
+
+// Persistent red banner across the top — shown when sync is broken.
+// Hidden when sync is healthy.
+function setSyncBanner(message) {
+  let el = document.getElementById("syncBanner");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "syncBanner";
+    el.className = "sync-banner";
+    el.innerHTML = `
+      <span class="sync-banner-msg"></span>
+      <button class="sync-banner-btn" onclick="location.reload()">Refresh</button>
+      <button class="sync-banner-btn sync-banner-btn-secondary" onclick="document.getElementById('syncBanner').classList.remove('show')">Dismiss</button>
+    `;
+    document.body.appendChild(el);
+  }
+  if (message) {
+    el.querySelector(".sync-banner-msg").textContent = message;
+    el.classList.add("show");
+  } else {
+    el.classList.remove("show");
+  }
+}
+function uid(p) { return p + "_" + Math.random().toString(36).slice(2,8); }
+function isHebrew(s) { return /[֐-׿]/.test(s||""); }
+function toast(msg) {
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), 1500);
+}
+function escapeHtml(s) {
+  return String(s||"").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
+}
+function copyText(t) { navigator.clipboard?.writeText(t).then(() => toast("Copied: " + t)); }
+
+// Undo toast — replaces chrome confirm dialogs for delete actions
+let _undoToastEl = null;
+let _undoTimer = null;
+function showUndoToast(message, undoFn) {
+  if (_undoToastEl) { _undoToastEl.remove(); clearTimeout(_undoTimer); }
+  const el = document.createElement("div");
+  el.className = "undo-toast";
+  el.innerHTML = `<span></span><button>Undo</button>`;
+  el.querySelector("span").textContent = message;
+  el.querySelector("button").onclick = () => {
+    clearTimeout(_undoTimer);
+    undoFn();
+    el.remove();
+    _undoToastEl = null;
+  };
+  document.body.appendChild(el);
+  _undoToastEl = el;
+  _undoTimer = setTimeout(() => { el.remove(); _undoToastEl = null; }, 8000);
+}
+
+// ---------- INLINE FORMATTING (bold red, bold black, strike-through) ----------
+const HL_CLASSES = ["hl-red", "hl-black", "hl-strike"];
+// Tags that carry meaningful formatting (kept as-is, attributes stripped)
+const RICH_TAGS = new Set(["b", "strong", "i", "em", "u", "br"]);
+
+function sanitizeRichText(html) {
+  const tmp = document.createElement("div");
+  tmp.innerHTML = html;
+  const walk = (node) => {
+    Array.from(node.childNodes).forEach(child => {
+      if (child.nodeType === 3) return;            // text node — keep
+      if (child.nodeType !== 1) { node.removeChild(child); return; }
+      const tag = child.tagName.toLowerCase();
+      const cls = HL_CLASSES.find(c => child.classList.contains(c));
+      if (tag === "span" && cls) {
+        // hl-* span — keep, strip other attributes
+        const clean = document.createElement("span");
+        clean.className = cls;
+        while (child.firstChild) clean.appendChild(child.firstChild);
+        node.replaceChild(clean, child);
+        walk(clean);
+      } else if (RICH_TAGS.has(tag)) {
+        // <b>/<strong>/<i>/<em>/<u>/<br> — keep, strip attributes
+        const clean = document.createElement(tag);
+        while (child.firstChild) clean.appendChild(child.firstChild);
+        node.replaceChild(clean, child);
+        walk(clean);
+      } else if (tag === "div" || tag === "p") {
+        // Browser inserts these on Enter — turn into a <br> so the line break survives
+        const br = document.createElement("br");
+        node.insertBefore(br, child);
+        while (child.firstChild) node.insertBefore(child.firstChild, child);
+        node.removeChild(child);
+      } else {
+        // unwrap unsupported element — keep text content only
+        while (child.firstChild) node.insertBefore(child.firstChild, child);
+        node.removeChild(child);
+      }
+    });
+  };
+  walk(tmp);
+  return tmp.innerHTML;
+}
+
+let _selectionTimer = null;
+document.addEventListener("selectionchange", () => {
+  if (_selectionTimer) clearTimeout(_selectionTimer);
+  _selectionTimer = setTimeout(updateFormatToolbar, 80);
+});
+
+function updateFormatToolbar() {
+  const sel = window.getSelection();
+  const toolbar = document.getElementById("formatToolbar");
+  if (!toolbar) return;
+  if (!sel.rangeCount || !sel.toString().trim()) {
+    toolbar.classList.remove("show");
+    return;
+  }
+  const range = sel.getRangeAt(0);
+  const node = range.commonAncestorContainer;
+  const el = node.nodeType === 3 ? node.parentElement : node;
+  const editable = el && el.closest && el.closest(".ntext, .hblock-title");
+  if (!editable) {
+    toolbar.classList.remove("show");
+    return;
+  }
+  const rect = range.getBoundingClientRect();
+  toolbar.classList.add("show");
+  // Position above selection, clamped to viewport
+  const tw = toolbar.offsetWidth || 140;
+  toolbar.style.left = Math.max(8, Math.min(window.innerWidth - tw - 8, rect.left + rect.width/2 - tw/2)) + "px";
+  toolbar.style.top  = Math.max(8, rect.top - 38) + "px";
+}
+
+function applyHighlight(kind) {
+  const sel = window.getSelection();
+  if (!sel.rangeCount) return;
+  const range = sel.getRangeAt(0);
+  if (range.collapsed) return;
+
+  const startNode = range.startContainer.nodeType === 3 ? range.startContainer.parentElement : range.startContainer;
+  const endNode   = range.endContainer.nodeType === 3 ? range.endContainer.parentElement   : range.endContainer;
+  const editable  = startNode.closest('[contenteditable=""], [contenteditable="true"]');
+  if (!editable) return;
+
+  const newClass = kind === "red" ? "hl-red" : kind === "black" ? "hl-black" : "hl-strike";
+
+  // Toggle off: if the selection's start and end are both inside the same span of newClass,
+  // treat this as "remove that formatting".
+  const startWrap = startNode.closest("." + newClass);
+  const endWrap   = endNode.closest("." + newClass);
+  const isToggleOff = startWrap && startWrap === endWrap;
+
+  // Extract the selection and strip any existing hl-* spans inside it
+  const fragment = range.extractContents();
+  const unwrapAll = (node) => {
+    Array.from(node.childNodes).forEach(child => {
+      if (child.nodeType === 1) {
+        if (child.tagName === "SPAN" && HL_CLASSES.some(c => child.classList.contains(c))) {
+          while (child.firstChild) node.insertBefore(child.firstChild, child);
+          node.removeChild(child);
+        } else {
+          unwrapAll(child);
+        }
+      }
+    });
+  };
+  unwrapAll(fragment);
+
+  if (isToggleOff) {
+    // Re-insert the cleaned fragment back into the (now empty/partial) wrapper position
+    range.insertNode(fragment);
+    // Then unwrap the entire wrapper span — full undo of the bolding/strike
+    const parent = startWrap.parentNode;
+    while (startWrap.firstChild) parent.insertBefore(startWrap.firstChild, startWrap);
+    parent.removeChild(startWrap);
+  } else {
+    // Wrap the cleaned fragment in a fresh span of newClass
+    const span = document.createElement("span");
+    span.className = newClass;
+    span.appendChild(fragment);
+    range.insertNode(span);
+  }
+
+  // Clean up: remove any empty hl-* spans left behind by the extract+split
+  editable.querySelectorAll(".hl-red, .hl-black, .hl-strike").forEach(s => {
+    if (!s.textContent) s.remove();
+  });
+  editable.normalize();
+  editable.dispatchEvent(new Event("input", { bubbles: true }));
+  sel.removeAllRanges();
+  document.getElementById("formatToolbar").classList.remove("show");
+}
+
+function clearHighlight() {
+  const sel = window.getSelection();
+  if (!sel.rangeCount) return;
+  const range = sel.getRangeAt(0);
+  if (range.collapsed) return;
+
+  // Find the editable ancestor before we mutate the DOM
+  const startNode = range.startContainer.nodeType === 3 ? range.startContainer.parentElement : range.startContainer;
+  const editable = startNode.closest('[contenteditable=""], [contenteditable="true"]');
+
+  // Extract the selection (this auto-splits any spans the selection partially crosses)
+  const fragment = range.extractContents();
+
+  // Walk the fragment and unwrap every hl-red / hl-black / hl-strike span,
+  // keeping their text content. Nested spans are handled recursively.
+  const unwrapHl = (node) => {
+    Array.from(node.childNodes).forEach(child => {
+      if (child.nodeType === 1) {
+        if (child.tagName === "SPAN" && HL_CLASSES.some(c => child.classList.contains(c))) {
+          // unwrap: replace the span with its children
+          while (child.firstChild) node.insertBefore(child.firstChild, child);
+          node.removeChild(child);
+        } else {
+          unwrapHl(child);
+        }
+      }
+    });
+  };
+  unwrapHl(fragment);
+
+  // Re-insert the cleaned fragment
+  range.insertNode(fragment);
+
+  if (editable) {
+    // Merge any adjacent text nodes that resulted from the unwrap
+    editable.normalize();
+    editable.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+  sel.removeAllRanges();
+  document.getElementById("formatToolbar").classList.remove("show");
+}
+
+// ---------- TAB VISIBILITY ----------
+function toggleTabSettings() {
+  const pop = document.getElementById("tabSettingsPop");
+  if (!pop.classList.contains("show")) renderTabSettings();
+  pop.classList.toggle("show");
+}
+function renderTabSettings() {
+  const pop = document.getElementById("tabSettingsPop");
+  const allTabs = [
+    { id: "daily", label: "Daily" },
+    { id: "info", label: "Info" },
+    { id: "cadence", label: "Cadence" }
+  ];
+  pop.innerHTML = `
+    <div class="settings-group-label">Tabs</div>
+    ${allTabs.map(t => `
+      <label>
+        <input type="checkbox" data-tab="${t.id}" ${state.hiddenTabs?.includes(t.id) ? "" : "checked"}
+               onchange="setTabHidden('${t.id}', !this.checked)">
+        ${t.label}
+      </label>
+    `).join("")}
+    <div class="settings-divider"></div>
+    <div class="settings-group-label">Backup</div>
+    <button class="settings-btn" onclick="exportData(); document.getElementById('tabSettingsPop').classList.remove('show')">⬇ Download backup (JSON)</button>
+    <button class="settings-btn" onclick="importData(); document.getElementById('tabSettingsPop').classList.remove('show')">⬆ Restore from backup…</button>
+  `;
+}
+
+// ---------- BACKUP: export / import all data as JSON ----------
+function exportData() {
+  const payload = JSON.stringify(state, null, 2);
+  const blob = new Blob([payload], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  const today = new Date().toISOString().slice(0, 10);
+  a.href = url;
+  a.download = `todo-dashboard-backup-${today}.json`;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => {
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, 200);
+  toast("Backup downloaded");
+}
+function importData() {
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = ".json,application/json";
+  input.style.display = "none";
+  input.onchange = e => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      try {
+        const parsed = JSON.parse(ev.target.result);
+        // Sanity check: needs to look like a dashboard backup
+        if (!parsed || typeof parsed !== "object" || !parsed.daily || !parsed.info) {
+          toast("That file doesn't look like a dashboard backup");
+          return;
+        }
+        // Snapshot current state for one-tap undo
+        const before = structuredClone(state);
+        state = parsed;
+        save();
+        // Re-render everything
+        renderStrip();
+        renderDaily();
+        renderInfo();
+        renderCadence();
+        applyTabHidden();
+        if (state.activeTab && document.querySelector(`.tab[data-tab="${state.activeTab}"]:not(.hidden-tab)`)) {
+          setActiveTab(state.activeTab);
+        }
+        showUndoToast("Backup restored — undo to return to previous data", () => {
+          state = before;
+          save();
+          renderStrip();
+          renderDaily();
+          renderInfo();
+          renderCadence();
+          applyTabHidden();
+        });
+      } catch (e) {
+        toast("Couldn't read that backup file");
+        console.warn("Import failed:", e);
+      }
+    };
+    reader.readAsText(file);
+  };
+  document.body.appendChild(input);
+  input.click();
+  setTimeout(() => document.body.removeChild(input), 100);
+}
+function setTabHidden(tabId, hidden) {
+  state.hiddenTabs = state.hiddenTabs || [];
+  if (hidden && !state.hiddenTabs.includes(tabId)) state.hiddenTabs.push(tabId);
+  else if (!hidden) state.hiddenTabs = state.hiddenTabs.filter(t => t !== tabId);
+  save();
+  applyTabHidden();
+  if (state.activeTab === tabId && hidden) {
+    const firstVisible = document.querySelector(".tab:not(.hidden-tab)");
+    if (firstVisible) setActiveTab(firstVisible.dataset.tab);
+  }
+}
+function applyTabHidden() {
+  document.querySelectorAll(".tab").forEach(t => {
+    t.classList.toggle("hidden-tab", (state.hiddenTabs || []).includes(t.dataset.tab));
+  });
+}
+// Close tab settings popover when clicking outside it
+document.addEventListener("click", e => {
+  const pop = document.getElementById("tabSettingsPop");
+  if (!pop) return;
+  if (e.target.closest(".tab-cog")) return;
+  if (e.target.closest("#tabSettingsPop")) return;
+  pop.classList.remove("show");
+});
+
+// Focus + select-all helper for "auto-clear placeholder on type" pattern
+function focusAndSelect(selector, makeEditable = true) {
+  function attempt(retry) {
+    const el = document.querySelector(selector);
+    if (!el) {
+      if (retry > 0) setTimeout(() => attempt(retry - 1), 60);
+      return;
+    }
+    if (makeEditable) el.contentEditable = "true";
+    // Force layout flush before focusing — newly-rendered elements sometimes
+    // don't take focus on the first try without this.
+    void el.offsetHeight;
+    el.focus({ preventScroll: false });
+    // Try Selection API + execCommand for maximum reliability
+    try {
+      const r = document.createRange();
+      r.selectNodeContents(el);
+      const s = window.getSelection();
+      s.removeAllRanges();
+      s.addRange(r);
+    } catch (e) { /* ignore */ }
+    try { document.execCommand("selectAll", false, null); } catch (e) { /* ignore */ }
+  }
+  requestAnimationFrame(() => attempt(4));
+}
+
+// ---------- TOP STRIP — load values from state, click=copy, dblclick=edit ----------
+function renderStrip() {
+  if (!state.strip) state.strip = { hp: "", tikNikuyim: "", bkPeriod: "" };
+  document.querySelectorAll(".strip .val").forEach(el => {
+    const k = el.dataset.key;
+    if (k && state.strip[k] !== undefined) el.textContent = state.strip[k];
+  });
+  checkBkPeriod();
+}
+function setupStripInteractions() {
+  document.querySelectorAll(".strip .val").forEach(el => {
+    el.addEventListener("click", () => {
+      if (el.contentEditable === "true") return;
+      copyText(el.textContent.trim());
+    });
+    el.addEventListener("dblclick", () => {
+      el.contentEditable = "true";
+      el.focus();
+      const r = document.createRange();
+      r.selectNodeContents(el);
+      const s = window.getSelection();
+      s.removeAllRanges();
+      s.addRange(r);
+    });
+    el.addEventListener("blur", () => {
+      if (el.contentEditable !== "true") return;
+      el.contentEditable = "false";
+      const k = el.dataset.key;
+      if (k) {
+        state.strip = state.strip || {};
+        state.strip[k] = el.textContent.trim();
+        save();
+        if (k === "bkPeriod") checkBkPeriod();
+      }
+    });
+    el.addEventListener("keydown", e => {
+      if (e.key === "Enter") { e.preventDefault(); el.blur(); }
+      if (e.key === "Escape") { e.preventDefault(); el.blur(); }
+    });
+  });
+}
+function checkBkPeriod() {
+  const el = document.getElementById("bkPeriod");
+  const m = el.textContent.trim().match(/(\d{1,2})\.(\d{1,2})\.(\d{2,4})\s*$/);
+  if (!m) { el.classList.remove("expired"); return; }
+  const [, d, mo, y] = m;
+  const yr = y.length === 2 ? 2000 + parseInt(y,10) : parseInt(y,10);
+  const end = new Date(yr, parseInt(mo,10)-1, parseInt(d,10));
+  if (new Date() > end) el.classList.add("expired");
+  else el.classList.remove("expired");
+}
+
+// ---------- TAB SWITCHING (persisted across reloads) ----------
+function setActiveTab(name) {
+  document.querySelectorAll(".tab").forEach(b => b.classList.toggle("active", b.dataset.tab === name));
+  document.querySelectorAll(".pane").forEach(p => p.classList.toggle("active", p.id === "pane-" + name));
+  state.activeTab = name;
+  save();
+}
+document.querySelectorAll(".tab").forEach(btn => {
+  btn.addEventListener("click", () => setActiveTab(btn.dataset.tab));
+});
+
+// ---------- PERSON CHIP RENDERING ----------
+function renderPersonChip(p, asTitle, sectionId, personIdx) {
+  if (!p || !p.name) return "";
+  const hasEmail = p.email && p.email.length > 0 && !p.email.includes("[fill in]");
+  const hasPhone = p.phone && p.phone.length > 0;
+  const sid = sectionId || "";
+  const pi = personIdx ?? 0;
+  // On iPhone, show only the first name on the chip itself (full name still in the popover).
+  const chipLabel = (typeof IS_MOBILE !== "undefined" && IS_MOBILE)
+    ? (p.name.trim().split(/\s+/)[0] || p.name)
+    : p.name;
+  return `
+    <span class="person-chip ${asTitle ? 'as-title' : ''}" data-rtl="${isHebrew(p.name)}">
+      ${escapeHtml(chipLabel)}
+      <span class="person-popover">
+        <div class="p-name dbl-edit" data-update="person:${sid}:${pi}:name" title="Double-click to edit name">${escapeHtml(p.name)}</div>
+        ${hasEmail ? `<div class="p-row"><span class="lbl">Email</span><span class="val copyable dbl-edit" data-update="person:${sid}:${pi}:email" onclick="popClick(event, this)" title="Click to copy · Double-click to edit">${escapeHtml(p.email)}</span></div>` : ""}
+        ${hasPhone ? `<div class="p-row"><span class="lbl">Phone</span><span class="val copyable dbl-edit" data-update="person:${sid}:${pi}:phone" onclick="popClick(event, this)" title="Click to copy · Double-click to edit">${escapeHtml(p.phone)}</span></div>` : ""}
+        <div class="p-row"><span class="lbl">Note</span><span class="val dbl-edit" data-update="person:${sid}:${pi}:note">${escapeHtml(p.note || "")}</span></div>
+      </span>
+    </span>
+  `;
+}
+// Click-to-copy with double-click-edit coexistence (popover + Info tab)
+function popClick(ev, el) {
+  ev.stopPropagation();
+  if (el.contentEditable === "true") return;
+  if (el._clickTimer) clearTimeout(el._clickTimer);
+  el._clickTimer = setTimeout(() => {
+    el._clickTimer = null;
+    if (el.contentEditable === "true") return;
+    const txt = (el.innerText || "").trim();
+    if (txt) copyText(txt);
+  }, 220);
+}
+
+// ---------- DAILY ----------
+function renderDaily() {
+  const root = document.getElementById("pane-daily");
+  root.innerHTML = "";
+  state.daily.sections.forEach(section => {
+    const collapsed = !!state.daily.sectionCollapsed[section.id];
+    const sec = document.createElement("div");
+    sec.className = "section" + (collapsed ? " collapsed" : "");
+
+    // Eric uses his name as the section title (no extra chip).
+    // Other sections render plain title + chips for each person.
+    let titleHtml;
+    if (section.titleAsPerson) {
+      const titleIdx = (section.people || []).findIndex(p => p.isTitle);
+      const titlePerson = titleIdx >= 0 ? section.people[titleIdx] : (section.people || [])[0];
+      titleHtml = renderPersonChip(titlePerson, true, section.id, titleIdx >= 0 ? titleIdx : 0);
+    } else {
+      const chips = (section.people || []).map((p, i) => p.isTitle ? "" : renderPersonChip(p, false, section.id, i)).join(" ");
+      titleHtml = `<span>${escapeHtml(section.title)}</span>` + chips;
+    }
+
+    sec.innerHTML = `
+      <div class="section-head" onclick="toggleDailySection('${section.id}', event)">
+        <div class="title-area">${titleHtml}</div>
+        <div class="head-right">
+          <button class="add-header-btn" onclick="event.stopPropagation(); addBlock('${section.id}')">＋ Header</button>
+          <span class="meta">${section.blocks.length}</span>
+          <span class="chev">▾</span>
+        </div>
+      </div>
+      <div class="section-body" data-section="${section.id}"></div>
+    `;
+    root.appendChild(sec);
+    const body = sec.querySelector(".section-body");
+    section.blocks.forEach(block => body.appendChild(renderBlock(section.id, block)));
+  });
+}
+function toggleDailySection(id, ev) {
+  // Don't toggle if clicking on a person-chip or its popover
+  if (ev && (ev.target.closest(".person-chip") || ev.target.closest(".person-popover"))) return;
+  state.daily.sectionCollapsed[id] = !state.daily.sectionCollapsed[id];
+  save(); renderDaily();
+}
+function renderBlock(sectionId, block) {
+  const el = document.createElement("div");
+  // Detect Hebrew context: title OR any of the notes contain Hebrew
+  const isHe = isHebrew(block.title) || (block.notes || []).some(n => isHebrew(n));
+  const collapsed = !!(state.daily.blockCollapsed || {})[block.id];
+  el.className = "hblock" + (isHe ? " rtl" : "") + (collapsed ? " collapsed" : "");
+  el.dataset.sectionId = sectionId;
+  el.dataset.blockId = block.id;
+  // Drag-to-reorder hooks (drop target — within the same section only)
+  el.addEventListener("dragover", onBlockDragOver);
+  el.addEventListener("drop", e => onBlockDrop(e, sectionId, block.id));
+  el.addEventListener("dragleave", e => {
+    if (!el.contains(e.relatedTarget)) el.classList.remove("drag-over");
+  });
+  // Each note renders as its own row under the title (stacked, one per line).
+  // Text is READ-ONLY until its Edit button is pressed (personal-dashboard model).
+  // Row anatomy: .note-inline (clip) → .note-actions (Edit + Delete, behind, iPhone swipe)
+  //                                   → .note-body (slides; ⠿ drag + text + Mac hover buttons)
+  const pencilSvg = `<svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>`;
+  const notesHtml = block.notes.map((n, i) => `
+    <div class="note-inline" data-rtl="${isHebrew(n)}" data-note-idx="${i}">
+      <div class="note-actions">
+        <button class="note-swipe-btn edit" onclick="noteEditStart('${sectionId}','${block.id}',${i})">Edit</button>
+        <button class="note-swipe-btn del" onclick="delNote('${sectionId}','${block.id}',${i})">Delete</button>
+      </div>
+      <div class="note-body"
+           ontouchstart="noteSwipeStart(event)"
+           ontouchmove="noteSwipeMove(event)"
+           ontouchend="noteSwipeEnd(event)">
+        <span class="note-grab" title="Drag to reorder"
+              onpointerdown="noteReorderStart(event,'${sectionId}','${block.id}',${i})">⠿</span>
+        <span class="ntext" data-rtl="${isHebrew(n)}" data-ph="New note…"
+              oninput="updNote('${sectionId}','${block.id}',${i},this.innerHTML)">${n || ""}</span>
+        <button class="note-act edit" title="Edit" onclick="noteEditStart('${sectionId}','${block.id}',${i})">${pencilSvg}</button>
+        <button class="note-act del" title="Delete" onclick="delNote('${sectionId}','${block.id}',${i})">×</button>
+      </div>
+    </div>
+  `).join("");
+  el.innerHTML = `
+    <div class="hblock-head">
+      <div class="note-actions">
+        <button class="note-swipe-btn edit" onclick="titleEditStart('${block.id}')">Edit</button>
+        <button class="note-swipe-btn del" onclick="delBlock('${sectionId}','${block.id}')">Delete</button>
+      </div>
+      <div class="hblock-toprow"
+           onclick="toggleBlock(event,'${block.id}')"
+           ontouchstart="noteSwipeStart(event)"
+           ontouchmove="noteSwipeMove(event)"
+           ontouchend="noteSwipeEnd(event)">
+        <span class="hblock-drag-handle" draggable="true"
+              ondragstart="onBlockDragStart(event,'${sectionId}','${block.id}')"
+              ondragend="onBlockDragEnd(event)"
+              title="Drag to reorder">⋮⋮</span>
+        <span class="hblock-title" data-block-id="${block.id}" data-rtl="${isHe}"
+              oninput="updBlockTitle('${sectionId}','${block.id}',this.innerHTML)">${block.title || ""}</span>
+        ${collapsed ? `<span class="hblock-count">${block.notes.length}</span>` : ""}
+        <span class="toprow-gap"></span>
+        <button class="note-act edit" title="Edit header" onclick="event.stopPropagation(); titleEditStart('${block.id}')">${pencilSvg}</button>
+        <button class="note-act del" title="Delete header" onclick="event.stopPropagation(); delBlock('${sectionId}','${block.id}')">×</button>
+        <span class="hblock-chev">▾</span>
+      </div>
+    </div>
+    <div class="hblock-notes">
+      ${notesHtml}
+      <button class="add-ghost add-note-ghost" onclick="addNote('${sectionId}','${block.id}')">+ note</button>
+    </div>
+  `;
+  return el;
+}
+
+// ---------- BLOCK COLLAPSE (click the header line to fold/unfold its notes) ----------
+function toggleBlock(ev, bid) {
+  // Ignore clicks on the action buttons, drag handle, or a title mid-edit
+  if (ev.target.closest(".note-act") || ev.target.closest(".hblock-drag-handle")) return;
+  if (ev.target.closest(".hblock-title.editing")) return;
+  // Ignore the click that trails a horizontal swipe on iPhone
+  if (Date.now() - _lastSwipeTs < 400) return;
+  state.daily.blockCollapsed = state.daily.blockCollapsed || {};
+  state.daily.blockCollapsed[bid] = !state.daily.blockCollapsed[bid];
+  save(); renderDaily();
+}
+
+// ---------- GATED EDITING (Edit button → editable; blur/Enter → read-only) ----------
+function _enterEdit(el, selectAll = false) {
+  if (!el) return;
+  closeNoteSwipe();
+  el.setAttribute("contenteditable", "true");
+  el.classList.add("editing");
+  // Focus SYNCHRONOUSLY — iOS only opens the keyboard while the tap's
+  // user-activation is still live. Caret at the end, or select-all so
+  // typing replaces (new headers).
+  void el.offsetHeight; // layout flush so focus lands on first try
+  el.focus();
+  try {
+    const r = document.createRange();
+    r.selectNodeContents(el);
+    if (!selectAll) r.collapse(false);
+    const s = window.getSelection();
+    s.removeAllRanges();
+    s.addRange(r);
+  } catch (e) { /* ignore */ }
+  const done = () => {
+    el.removeAttribute("contenteditable");
+    el.classList.remove("editing");
+  };
+  el.addEventListener("blur", done, { once: true });
+  el.addEventListener("keydown", function onKey(e) {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); el.blur(); el.removeEventListener("keydown", onKey); }
+    if (e.key === "Escape") { e.preventDefault(); el.blur(); el.removeEventListener("keydown", onKey); }
+  });
+}
+function noteEditStart(sid, bid, idx) {
+  const blockEl = document.querySelector(`.hblock[data-block-id="${bid}"]`);
+  _enterEdit(blockEl?.querySelector(`.note-inline[data-note-idx="${idx}"] .ntext`));
+}
+function titleEditStart(bid) {
+  _enterEdit(document.querySelector(`.hblock-title[data-block-id="${bid}"]`));
+}
+function addBlock(sid) {
+  const newId = uid("b");
+  // Expand the section if collapsed so the new block is visible/focusable
+  if (state.daily.sectionCollapsed[sid]) state.daily.sectionCollapsed[sid] = false;
+  state.daily.sections.find(s => s.id === sid).blocks.push({ id: newId, title: "New header", notes: [""] });
+  save(); renderDaily();
+  // Synchronous: renderDaily already put the element in the DOM, and iOS
+  // needs the focus to happen inside the tap's user-activation window.
+  _enterEdit(document.querySelector(`.hblock-title[data-block-id="${newId}"]`), true);
+}
+function delBlock(sid, bid) {
+  const sec = state.daily.sections.find(s => s.id === sid);
+  const idx = sec.blocks.findIndex(b => b.id === bid);
+  if (idx < 0) return;
+  const removed = sec.blocks.splice(idx, 1)[0];
+  save(); renderDaily();
+  showUndoToast(`"${removed.title}" removed`, () => {
+    sec.blocks.splice(idx, 0, removed);
+    save(); renderDaily();
+  });
+}
+
+// ---------- DAILY BLOCK DRAG & DROP REORDERING ----------
+// Drag a block by its ⋮⋮ handle to reorder within the same section.
+// Cross-section drags are ignored (different "Accounting" vs "Payroll" data).
+let _blockDragSrcSection = null;
+let _blockDragSrcId = null;
+
+function onBlockDragStart(ev, sectionId, blockId) {
+  _blockDragSrcSection = sectionId;
+  _blockDragSrcId = blockId;
+  try { ev.dataTransfer.setData("text/plain", blockId); } catch (e) {}
+  ev.dataTransfer.effectAllowed = "move";
+  const el = ev.target.closest(".hblock");
+  if (el) el.classList.add("dragging");
+}
+function onBlockDragEnd() {
+  document.querySelectorAll(".hblock.dragging, .hblock.drag-over").forEach(b => {
+    b.classList.remove("dragging");
+    b.classList.remove("drag-over");
+  });
+  _blockDragSrcSection = null;
+  _blockDragSrcId = null;
+}
+function onBlockDragOver(ev) {
+  if (!_blockDragSrcId) return;
+  const tgt = ev.currentTarget;
+  // Only allow drop within the same section
+  if (tgt.dataset.sectionId !== _blockDragSrcSection) return;
+  if (tgt.dataset.blockId === _blockDragSrcId) return;
+  ev.preventDefault();
+  ev.dataTransfer.dropEffect = "move";
+  document.querySelectorAll(".hblock.drag-over").forEach(b => {
+    if (b !== tgt) b.classList.remove("drag-over");
+  });
+  tgt.classList.add("drag-over");
+}
+function onBlockDrop(ev, sectionId, targetBlockId) {
+  ev.preventDefault();
+  document.querySelectorAll(".hblock.drag-over").forEach(b => b.classList.remove("drag-over"));
+  const srcId = _blockDragSrcId;
+  const srcSection = _blockDragSrcSection;
+  _blockDragSrcId = null;
+  _blockDragSrcSection = null;
+  if (!srcId || srcSection !== sectionId || srcId === targetBlockId) return;
+  const sec = state.daily.sections.find(s => s.id === sectionId);
+  if (!sec) return;
+  const srcIdx = sec.blocks.findIndex(b => b.id === srcId);
+  const tgtIdx = sec.blocks.findIndex(b => b.id === targetBlockId);
+  if (srcIdx < 0 || tgtIdx < 0) return;
+  const [moved] = sec.blocks.splice(srcIdx, 1);
+  sec.blocks.splice(tgtIdx, 0, moved);
+  save(); renderDaily();
+}
+
+// ---------- NOTE REORDER (pointer-based, ported from the personal dashboard) ----------
+// Grab the ⠿ handle and drag vertically. Works with mouse (Mac) and touch (iPhone):
+// pointer events + touch-action:none on the handle. Measures row midpoints once at
+// drag start, highlights the closest row while moving, splices the array on release.
+let _nr = null; // { sectionId, blockId, fromIdx, rows: [{idx, el, mid}], overIdx }
+
+function noteReorderStart(ev, sectionId, blockId, idx) {
+  ev.preventDefault();
+  ev.stopPropagation();
+  const blockEl = ev.target.closest(".hblock");
+  if (!blockEl) return;
+  const rows = [...blockEl.querySelectorAll(".note-inline")].map(el => {
+    const r = el.getBoundingClientRect();
+    return { idx: +el.dataset.noteIdx, el, mid: r.top + r.height / 2 };
+  });
+  _nr = { sectionId, blockId, fromIdx: idx, rows, overIdx: idx };
+  const src = rows.find(r => r.idx === idx);
+  if (src) src.el.classList.add("dragging");
+  document.body.style.userSelect = "none";
+  window.addEventListener("pointermove", noteReorderMove, { passive: false });
+  window.addEventListener("pointerup", noteReorderEnd);
+  window.addEventListener("pointercancel", noteReorderEnd);
+}
+function noteReorderMove(ev) {
+  if (!_nr) return;
+  ev.preventDefault();
+  let best = null, bestDist = Infinity;
+  for (const r of _nr.rows) {
+    const d = Math.abs(ev.clientY - r.mid);
+    if (d < bestDist) { bestDist = d; best = r; }
+  }
+  if (!best || best.idx === _nr.overIdx) return;
+  _nr.overIdx = best.idx;
+  _nr.rows.forEach(r => r.el.classList.toggle("drag-over", r.idx === best.idx && r.idx !== _nr.fromIdx));
+}
+function noteReorderEnd() {
+  window.removeEventListener("pointermove", noteReorderMove);
+  window.removeEventListener("pointerup", noteReorderEnd);
+  window.removeEventListener("pointercancel", noteReorderEnd);
+  document.body.style.userSelect = "";
+  if (!_nr) return;
+  const { sectionId, blockId, fromIdx, overIdx, rows } = _nr;
+  rows.forEach(r => r.el.classList.remove("dragging", "drag-over"));
+  _nr = null;
+  if (fromIdx === overIdx) return;
+  const blk = state.daily.sections.find(s => s.id === sectionId)?.blocks.find(b => b.id === blockId);
+  if (!blk) return;
+  const [moved] = blk.notes.splice(fromIdx, 1);
+  blk.notes.splice(overIdx, 0, moved);
+  save(); renderDaily();
+}
+
+// ---------- NOTE SWIPE (iPhone: swipe a note left to reveal Edit + Delete) ----------
+// Same pattern as the personal dashboard's item rows: direction-lock so vertical
+// scrolling stays native; the body slides over absolutely-positioned Edit/Delete
+// buttons; release past halfway snaps open, otherwise snaps shut.
+const NOTE_SWIPE_OPEN = -112; // matches .note-actions width (2 × 56px buttons)
+let _ns = null;              // in-flight gesture { body, startX, startY, openAt, locked, x }
+let _nsOpenBody = null;      // the one row currently left open, if any
+let _lastSwipeTs = 0;        // when the last horizontal swipe ended (suppresses its trailing click)
+
+function noteSwipeStart(ev) {
+  if (!document.body.classList.contains("is-mobile")) return;
+  if (ev.target.closest(".note-grab") || ev.target.closest(".hblock-drag-handle")) return; // drag handles own their touch
+  const body = ev.currentTarget;
+  if (_nsOpenBody && _nsOpenBody !== body) closeNoteSwipe();
+  const t = ev.touches[0];
+  _ns = { body, startX: t.clientX, startY: t.clientY, openAt: body === _nsOpenBody ? NOTE_SWIPE_OPEN : 0, locked: null, x: 0 };
+}
+function noteSwipeMove(ev) {
+  if (!_ns) return;
+  const t = ev.touches[0];
+  const dx = t.clientX - _ns.startX, dy = t.clientY - _ns.startY;
+  if (_ns.locked === null) {
+    if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
+    _ns.locked = Math.abs(dx) > Math.abs(dy) ? "h" : "v";
+  }
+  if (_ns.locked !== "h") return;
+  ev.preventDefault();
+  _ns.body.parentElement.classList.add("swipe-active");
+  _ns.x = Math.max(NOTE_SWIPE_OPEN, Math.min(0, _ns.openAt + dx));
+  _ns.body.style.transform = `translateX(${_ns.x}px)`;
+}
+function noteSwipeEnd() {
+  if (!_ns) return;
+  if (_ns.locked === "h") _lastSwipeTs = Date.now();
+  const settled = _ns.locked === "h" ? _ns.x : _ns.openAt;
+  if (settled < NOTE_SWIPE_OPEN / 2) {
+    _ns.body.style.transform = `translateX(${NOTE_SWIPE_OPEN}px)`;
+    _nsOpenBody = _ns.body;
+  } else {
+    _ns.body.style.transform = "";
+    _ns.body.parentElement.classList.remove("swipe-active");
+    if (_nsOpenBody === _ns.body) _nsOpenBody = null;
+  }
+  _ns = null;
+}
+function closeNoteSwipe() {
+  if (!_nsOpenBody) return;
+  _nsOpenBody.style.transform = "";
+  _nsOpenBody.parentElement.classList.remove("swipe-active");
+  _nsOpenBody = null;
+}
+// Tapping anywhere else closes an open swipe row
+document.addEventListener("touchstart", ev => {
+  if (_nsOpenBody && !_nsOpenBody.parentElement.contains(ev.target)) closeNoteSwipe();
+}, true);
+function updBlockTitle(sid, bid, t) {
+  state.daily.sections.find(s => s.id === sid).blocks.find(b => b.id === bid).title = sanitizeRichText(t);
+  save();
+}
+function addNote(sid, bid) {
+  const blk = state.daily.sections.find(s => s.id === sid).blocks.find(b => b.id === bid);
+  blk.notes.push("");
+  save(); renderDaily();
+  // Open the new (last) note in edit mode so the keyboard is ready.
+  // Synchronous — same iOS user-activation constraint as addBlock.
+  noteEditStart(sid, bid, blk.notes.length - 1);
+}
+function delNote(sid, bid, i) {
+  const blk = state.daily.sections.find(s => s.id === sid).blocks.find(b => b.id === bid);
+  const removed = blk.notes.splice(i, 1)[0];
+  save(); renderDaily();
+  showUndoToast(`Note removed`, () => {
+    blk.notes.splice(i, 0, removed);
+    save(); renderDaily();
+  });
+}
+function updNote(sid, bid, i, t) {
+  state.daily.sections.find(s => s.id === sid).blocks.find(b => b.id === bid).notes[i] = sanitizeRichText(t);
+  save();
+}
+
+// ---------- INFO ----------
+function renderInfo() {
+  const root = document.getElementById("pane-info");
+  root.innerHTML = "";
+
+  // Bank cards — click value to copy, double-click any field to edit; "+" adds row; hover for ×
+  state.info.banks.forEach((b, bi) => {
+    const card = document.createElement("div");
+    card.className = "icard";
+    card.innerHTML = `
+      <div class="icard-head">
+        <h3 class="dbl-edit copyable" data-update="bankName:${bi}" onclick="popClick(event, this)" title="Click to copy · Double-click to edit">${escapeHtml(b.name)}</h3>
+        <button class="icard-add" onclick="addBankRow(${bi})" title="Add row">+</button>
+      </div>` +
+      b.rows.map((r, ri) => `
+        <div class="row">
+          <span class="lbl dbl-edit" data-update="bankRow:${bi}:${ri}:lbl">${escapeHtml(r.lbl)}</span>
+          <span class="val ${r.rtl ? 'he' : ''}" style="display:flex; align-items:center; gap:4px; justify-content:flex-end; min-width:0;">
+            <span class="dbl-edit copyable" data-update="bankRow:${bi}:${ri}:val" onclick="popClick(event, this)" title="Click to copy · Double-click to edit">${escapeHtml(r.val)}</span>
+            <button class="row-del" onclick="delBankRow(${bi},${ri})" title="Delete row">×</button>
+          </span>
+        </div>
+      `).join("");
+    root.appendChild(card);
+  });
+
+  // Contacts — single-line, double-click to edit; phone appears only when populated
+  const renderContact = (group, c, i) => {
+    const isHe = isHebrew(c.role);
+    const hasPhone = c.phone && String(c.phone).trim().length > 0;
+    const phoneHtml = hasPhone
+      ? `<span class="phone dbl-edit copyable" data-update="contact:${group}:${i}:phone" onclick="popClick(event, this)" title="Click to copy · Double-click to edit">${escapeHtml(c.phone)}</span>`
+      : `<button class="add-phone" onclick="addContactPhone('${group}',${i})" title="Add phone">+ phone</button>`;
+    return `
+      <div class="contact-row${isHe ? ' rtl' : ''}">
+        <span class="role dbl-edit copyable" data-update="contact:${group}:${i}:role" onclick="popClick(event, this)" title="Click to copy · Double-click to edit">${escapeHtml(c.role)}</span>
+        <span class="name-block">
+          <span class="he dbl-edit copyable" data-update="contact:${group}:${i}:he" onclick="popClick(event, this)" title="Click to copy · Double-click to edit">${escapeHtml(c.he)}</span>
+          ${phoneHtml}
+        </span>
+        <button class="row-del" onclick="delContact('${group}',${i})" title="Delete contact">×</button>
+      </div>
+    `;
+  };
+
+  const ey = document.createElement("div");
+  ey.className = "icard";
+  ey.innerHTML = `
+    <div class="icard-head">
+      <h3>EY — External auditors</h3>
+      <button class="icard-add" onclick="addContact('ey')" title="Add contact">+</button>
+    </div>` +
+    state.info.contacts.ey.map((c, i) => renderContact('ey', c, i)).join("");
+  root.appendChild(ey);
+
+  const lg = document.createElement("div");
+  lg.className = "icard";
+  lg.innerHTML = `
+    <div class="icard-head">
+      <h3>Legal</h3>
+      <button class="icard-add" onclick="addContact('legal')" title="Add contact">+</button>
+    </div>` +
+    state.info.contacts.legal.map((c, i) => renderContact('legal', c, i)).join("");
+  root.appendChild(lg);
+
+  // Procedures — collapsible bubbles, dbl-click title or body to edit, "+" inline
+  const procWrap = document.createElement("div");
+  procWrap.style.marginTop = "12px";
+  procWrap.innerHTML = `
+    <div class="icard-head" style="margin-bottom:6px; padding:0 4px; display:grid; grid-template-columns: 1fr auto 1fr; align-items:center;">
+      <span></span>
+      <h3 style="color:var(--accent); margin:0; text-align:center;">Procedures</h3>
+      <button class="icard-add" onclick="addProc()" title="Add procedure" style="justify-self:end;">+</button>
+    </div>
+  `;
+
+  state.info.procedures.forEach(p => {
+    const expanded = !!state.info.procExpanded[p.id];
+    const bubble = document.createElement("div");
+    bubble.className = "proc-bubble" + (expanded ? " expanded" : "");
+    bubble.dataset.procId = p.id;
+    bubble.addEventListener("dragover", onProcDragOver);
+    bubble.addEventListener("drop", e => onProcDrop(e, p.id));
+    bubble.addEventListener("dragleave", e => {
+      // Only remove highlight when leaving the bubble entirely
+      if (!bubble.contains(e.relatedTarget)) bubble.classList.remove("drag-over");
+    });
+    bubble.innerHTML = `
+      <div class="proc-bubble-head">
+        <span class="proc-drag-handle" draggable="true"
+              ondragstart="onProcDragStart(event,'${p.id}')"
+              ondragend="onProcDragEnd(event)"
+              title="Drag to reorder">⋮⋮</span>
+        <span class="proc-title dbl-edit rich-edit" data-update="proc:${p.id}:ttl"
+              style="flex:1; min-width:0;">${p.ttl || ""}</span>
+        <span style="display:flex; gap:4px; align-items:center; direction:ltr;">
+          <button class="row-del" onclick="event.stopPropagation(); delProc('${p.id}')" title="Delete procedure">×</button>
+          <span class="chev">▸</span>
+        </span>
+      </div>
+      <div class="proc-bubble-body dbl-edit rich-edit" data-update="proc:${p.id}:body">${p.body || ""}</div>
+    `;
+    // Whole header toggles expand/collapse on single click; double-click enters edit on title
+    let procClickTimer = null;
+    const head = bubble.querySelector(".proc-bubble-head");
+    head.addEventListener("click", e => {
+      if (e.target.closest("button")) return;
+      if (e.target.contentEditable === "true") return;
+      if (procClickTimer) clearTimeout(procClickTimer);
+      procClickTimer = setTimeout(() => {
+        procClickTimer = null;
+        toggleProc(p.id);
+      }, 220);
+    });
+    head.addEventListener("dblclick", () => {
+      if (procClickTimer) { clearTimeout(procClickTimer); procClickTimer = null; }
+    });
+    procWrap.appendChild(bubble);
+  });
+
+  root.appendChild(procWrap);
+}
+function toggleProc(id) {
+  state.info.procExpanded[id] = !state.info.procExpanded[id];
+  save(); renderInfo();
+}
+
+// Info add/delete helpers — delete uses hover-fade × + undo toast
+function copyBankVal(bi, ri) { copyText(state.info.banks[bi].rows[ri].val); }
+function addBankRow(bi) {
+  const newRi = state.info.banks[bi].rows.length;
+  state.info.banks[bi].rows.push({ lbl: "Label", val: "Value", copy: true });
+  save(); renderInfo();
+  focusAndSelect(`[data-update="bankRow:${bi}:${newRi}:lbl"]`);
+}
+function delBankRow(bi, ri) {
+  const removed = state.info.banks[bi].rows.splice(ri, 1)[0];
+  save(); renderInfo();
+  showUndoToast(`Row "${removed.lbl}" removed`, () => {
+    state.info.banks[bi].rows.splice(ri, 0, removed);
+    save(); renderInfo();
+  });
+}
+function addContact(group) {
+  const newIdx = state.info.contacts[group].length;
+  state.info.contacts[group].push({ role: "Role", he: "שם", en: "" });
+  save(); renderInfo();
+  focusAndSelect(`[data-update="contact:${group}:${newIdx}:role"]`);
+}
+function delContact(group, i) {
+  const removed = state.info.contacts[group].splice(i, 1)[0];
+  save(); renderInfo();
+  showUndoToast(`Contact "${removed.he || removed.en || removed.role}" removed`, () => {
+    state.info.contacts[group].splice(i, 0, removed);
+    save(); renderInfo();
+  });
+}
+function addContactPhone(group, i) {
+  state.info.contacts[group][i].phone = "Phone";
+  save(); renderInfo();
+  focusAndSelect(`[data-update="contact:${group}:${i}:phone"]`);
+}
+function addProc() {
+  const newProc = { id: uid("proc"), ttl: "כותרת חדשה", body: "" };
+  state.info.procedures.push(newProc);
+  state.info.procExpanded = state.info.procExpanded || {};
+  state.info.procExpanded[newProc.id] = true;
+  save(); renderInfo();
+  focusAndSelect(`[data-update="proc:${newProc.id}:ttl"]`);
+}
+function delProc(id) {
+  const idx = state.info.procedures.findIndex(p => p.id === id);
+  if (idx < 0) return;
+  const removed = state.info.procedures.splice(idx, 1)[0];
+  save(); renderInfo();
+  showUndoToast(`Procedure "${removed.ttl}" removed`, () => {
+    state.info.procedures.splice(idx, 0, removed);
+    save(); renderInfo();
+  });
+}
+function moveProc(id, delta) {
+  const procs = state.info.procedures;
+  const idx = procs.findIndex(p => p.id === id);
+  if (idx < 0) return;
+  const newIdx = idx + delta;
+  if (newIdx < 0 || newIdx >= procs.length) return;
+  const [moved] = procs.splice(idx, 1);
+  procs.splice(newIdx, 0, moved);
+  save(); renderInfo();
+}
+
+// ---------- PROCEDURE DRAG & DROP REORDERING ----------
+let _procDragSourceId = null;
+
+function onProcDragStart(ev, id) {
+  _procDragSourceId = id;
+  try { ev.dataTransfer.setData("text/plain", id); } catch (e) {}
+  ev.dataTransfer.effectAllowed = "move";
+  const bubble = ev.target.closest(".proc-bubble");
+  if (bubble) bubble.classList.add("dragging");
+}
+function onProcDragEnd(ev) {
+  document.querySelectorAll(".proc-bubble.dragging, .proc-bubble.drag-over")
+    .forEach(b => { b.classList.remove("dragging"); b.classList.remove("drag-over"); });
+  _procDragSourceId = null;
+}
+function onProcDragOver(ev) {
+  if (!_procDragSourceId) return;
+  ev.preventDefault();
+  ev.dataTransfer.dropEffect = "move";
+  const bubble = ev.currentTarget;
+  if (!bubble || bubble.dataset.procId === _procDragSourceId) return;
+  document.querySelectorAll(".proc-bubble.drag-over").forEach(b => {
+    if (b !== bubble) b.classList.remove("drag-over");
+  });
+  bubble.classList.add("drag-over");
+}
+function onProcDrop(ev, targetId) {
+  ev.preventDefault();
+  document.querySelectorAll(".proc-bubble.drag-over").forEach(b => b.classList.remove("drag-over"));
+  const srcId = _procDragSourceId;
+  _procDragSourceId = null;
+  if (!srcId || srcId === targetId) return;
+  const procs = state.info.procedures;
+  const srcIdx = procs.findIndex(p => p.id === srcId);
+  const tgtIdx = procs.findIndex(p => p.id === targetId);
+  if (srcIdx < 0 || tgtIdx < 0) return;
+  const [moved] = procs.splice(srcIdx, 1);
+  procs.splice(tgtIdx, 0, moved);
+  save(); renderInfo();
+}
+
+// Double-click to edit pattern for Info-tab fields
+function applyDblEditUpdate(path, txt, opts) {
+  // opts.commit = true means user finished editing (focusout) — apply unit normalization + re-render
+  // opts.commit = false (or omitted) means we're saving mid-typing — just persist state, no re-render
+  const isCommit = opts && opts.commit === true;
+  const parts = path.split(":");
+
+  if (parts[0] === "bankName") {
+    const bi = +parts[1];
+    if (state.info.banks[bi]) state.info.banks[bi].name = txt;
+  } else if (parts[0] === "bankRow") {
+    const bi = +parts[1], ri = +parts[2], field = parts[3];
+    if (state.info.banks[bi]?.rows[ri]) state.info.banks[bi].rows[ri][field] = txt;
+  } else if (parts[0] === "contact") {
+    const group = parts[1], i = +parts[2], field = parts[3];
+    if (state.info.contacts[group]?.[i]) state.info.contacts[group][i][field] = txt;
+  } else if (parts[0] === "proc") {
+    const p = state.info.procedures.find(x => x.id === parts[1]);
+    if (p) p[parts[2]] = txt;
+  } else if (parts[0] === "person") {
+    const secId = parts[1], i = +parts[2], field = parts[3];
+    const sec = state.daily.sections.find(s => s.id === secId);
+    if (sec?.people?.[i]) sec.people[i][field] = txt;
+    // Re-render only on commit so we don't lose cursor while typing
+    if (isCommit) renderDaily();
+  } else if (parts[0] === "cadKv") {
+    const secId = parts[1], itemId = parts[2], field = parts[3];
+    const sec = state.cadence.sections.find(s => s.id === secId);
+    if (sec) {
+      const it = sec.items.find(i => i.id === itemId);
+      if (it) {
+        if (field === "value" && it.unit && isCommit) {
+          // Auto-format with unit only on commit
+          const num = String(txt).replace(/[^\d.]/g, "");
+          if (num === "") it.value = "";
+          else if (it.unit === "₪") it.value = "₪" + num;
+          else if (it.unit === "%") it.value = num + "%";
+          else it.value = num + it.unit;
+          save();
+          renderCadence();
+          return;
+        } else {
+          it[field] = txt;
+        }
+      }
+    }
+  }
+  save();
+}
+document.addEventListener("dblclick", e => {
+  const el = e.target.closest(".dbl-edit");
+  if (!el || el.contentEditable === "true") return;
+  // Cancel any pending click-to-copy on this element
+  if (el._clickTimer) { clearTimeout(el._clickTimer); el._clickTimer = null; }
+  el.contentEditable = "true";
+  el.focus();
+  const r = document.createRange();
+  r.selectNodeContents(el);
+  const s = window.getSelection();
+  s.removeAllRanges();
+  s.addRange(r);
+});
+// Read text from a dbl-edit field — innerHTML for rich-edit (preserves bold / strike),
+// innerText for plain dbl-edit fields.
+function _readDblEdit(el) {
+  if (el.classList.contains("rich-edit")) {
+    return sanitizeRichText(el.innerHTML);
+  }
+  return el.innerText;
+}
+// Save on every keystroke so changes survive a refresh even mid-edit
+document.addEventListener("input", e => {
+  const el = e.target.closest && e.target.closest(".dbl-edit");
+  if (!el || el.contentEditable !== "true") return;
+  if (el.dataset.update) applyDblEditUpdate(el.dataset.update, _readDblEdit(el), { commit: false });
+});
+document.addEventListener("focusout", e => {
+  const el = e.target.closest && e.target.closest(".dbl-edit");
+  if (!el || el.contentEditable !== "true") return;
+  el.contentEditable = "false";
+  if (el.dataset.update) {
+    const txt = _readDblEdit(el);
+    applyDblEditUpdate(el.dataset.update, txt, { commit: true });
+    // If a contact phone was emptied, re-render Info so the "+ phone" button shows again
+    if (/^contact:[^:]+:\d+:phone$/.test(el.dataset.update) && !txt.trim()) {
+      renderInfo();
+    }
+  }
+});
+document.addEventListener("keydown", e => {
+  if (!e.target.classList || !e.target.classList.contains("dbl-edit")) return;
+  if (e.target.contentEditable !== "true") return;
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); e.target.blur(); }
+  if (e.key === "Escape") { e.preventDefault(); e.target.blur(); }
+});
+
+// ---------- CADENCE ----------
+function ymKey(d) { return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0"); }
+function fmtDate(d) { return String(d.getDate()).padStart(2,"0") + "/" + String(d.getMonth()+1).padStart(2,"0"); }
+function sameDay(a, b) { return a.toDateString() === b.toDateString(); }
+function dueDateForDay(day) {
+  const today = new Date();
+  return new Date(today.getFullYear(), today.getMonth(), day);
+}
+function statusFor(item) {
+  const today = new Date();
+  const due = dueDateForDay(item.dueDay);
+  const completed = (state.cadence.completions[ymKey(today)] || {})[item.id];
+  if (completed) return { cls: "green", label: "Done" };
+  if (today > due && !sameDay(today, due)) return { cls: "red", label: "Overdue (" + fmtDate(due) + ")" };
+  if (sameDay(today, due)) return { cls: "amber", label: "Due today" };
+  return { cls: "", label: "Due " + fmtDate(due) };
+}
+
+function renderCadence() {
+  const root = document.getElementById("pane-cadence");
+  const today = new Date();
+
+  root.innerHTML = "";
+
+  state.cadence.sections.forEach(sec => {
+    const collapsed = !!state.cadence.collapsed[sec.id];
+    const wrap = document.createElement("div");
+    wrap.className = "section" + (collapsed ? " collapsed" : "");
+    const head = document.createElement("div");
+    head.className = "section-head";
+    head.onclick = () => toggleCadSection(sec.id);
+
+    if (sec.type === "checklist") {
+      const done = sec.items.filter(i => (state.cadence.completions[ymKey(today)]||{})[i.id]).length;
+      head.innerHTML = `
+        <div class="title-area">
+          <span>${escapeHtml(sec.title)}</span>
+          <button class="copybtn" style="font-size:10px; padding:2px 8px;" onclick="event.stopPropagation(); resetMonthEnd('${sec.id}')" title="Clear all checks for this month">Reset</button>
+        </div>
+        <div class="head-right">
+          <span class="meta">${done}/${sec.items.length}</span>
+          <button class="icard-add" onclick="event.stopPropagation(); addCadItem('${sec.id}')" title="Add task">+</button>
+          <span class="chev">▾</span>
+        </div>
+      `;
+    } else {
+      head.innerHTML = `
+        <div class="title-area">
+          <span>${escapeHtml(sec.title)}</span>
+        </div>
+        <div class="head-right">
+          <span class="meta">${sec.items.length}</span>
+          <button class="icard-add" onclick="event.stopPropagation(); addCadItem('${sec.id}')" title="Add entry">+</button>
+          <span class="chev">▾</span>
+        </div>
+      `;
+    }
+    wrap.appendChild(head);
+
+    const body = document.createElement("div");
+    body.className = "section-body";
+    sec.items.forEach(item => body.appendChild(renderCadItem(sec, item)));
+    wrap.appendChild(body);
+
+    root.appendChild(wrap);
+  });
+}
+function toggleCadSection(id) {
+  state.cadence.collapsed[id] = !state.cadence.collapsed[id];
+  save(); renderCadence();
+}
+function resetMonthEnd(secId) {
+  const sec = state.cadence.sections.find(s => s.id === secId);
+  if (!sec) return;
+  const k = ymKey(new Date());
+  if (!state.cadence.completions[k]) return;
+  // Snapshot for undo
+  const snapshot = {};
+  sec.items.forEach(it => {
+    if (state.cadence.completions[k][it.id]) {
+      snapshot[it.id] = state.cadence.completions[k][it.id];
+      delete state.cadence.completions[k][it.id];
+    }
+  });
+  if (Object.keys(snapshot).length === 0) { toast("Nothing to reset"); return; }
+  save(); renderCadence();
+  showUndoToast(`${Object.keys(snapshot).length} item(s) reset`, () => {
+    state.cadence.completions[k] = state.cadence.completions[k] || {};
+    Object.assign(state.cadence.completions[k], snapshot);
+    save(); renderCadence();
+  });
+}
+
+function renderCadItem(sec, item) {
+  const el = document.createElement("div");
+  const isHe = isHebrew(item.name);
+  if (sec.type === "checklist") {
+    const st = statusFor(item);
+    const completed = (state.cadence.completions[ymKey(new Date())]||{})[item.id];
+    el.className = "cad-item " + st.cls + (completed ? " completed" : "") + (isHe ? " rtl" : "");
+    el.innerHTML = `
+      <button class="cad-checkbox" onclick="event.stopPropagation(); toggleCad('${sec.id}','${item.id}')"
+              title="${completed ? 'Done '+fmtDate(new Date(completed)) : 'Mark done'}">${completed ? "✓" : ""}</button>
+      <div class="cad-name" data-rtl="${isHebrew(item.name)}"
+           ${item.locked ? "" : `contenteditable="true" oninput="updCadName('${sec.id}','${item.id}',this.innerText)"`}
+           onclick="toggleCadDetail(this)">${escapeHtml(item.name)}</div>
+      <div class="cad-due ${st.cls}${completed ? ' done' : ''}">${escapeHtml(st.label)}</div>
+      <button class="cad-lock ${item.locked ? 'locked' : ''}" onclick="event.stopPropagation(); toggleLock('${sec.id}','${item.id}')"
+              title="${item.locked ? 'Unlock' : 'Lock'}">${item.locked ? "🔒" : "🔓"}</button>
+      <div class="cad-detail" data-rtl="${isHebrew(item.detail||'')}"
+           ${item.locked ? "" : `contenteditable="true" oninput="updCadDetail('${sec.id}','${item.id}',this.innerText)"`}>${escapeHtml(item.detail||'(no procedure note — click 🔓 to unlock and edit)')}</div>
+    `;
+  } else if (sec.type === "kv") {
+    el.className = "cad-item kv" + (isHe ? " rtl" : "");
+    el.innerHTML = `
+      <div class="cad-name" onclick="toggleCadDetail(this)">${escapeHtml(item.name)}</div>
+      <div class="kv-value dbl-edit" data-update="cadKv:${sec.id}:${item.id}:value"
+           onclick="event.stopPropagation();">${escapeHtml(item.value||"")}</div>
+      <button class="cad-lock" onclick="event.stopPropagation(); delCadItem('${sec.id}','${item.id}')" title="Delete">×</button>
+      <span></span>
+      <div class="cad-detail dbl-edit" data-update="cadKv:${sec.id}:${item.id}:detail">${escapeHtml(item.detail||"(double-click to add explanation)")}</div>
+    `;
+  } else {
+    el.className = "cad-item info" + (isHe ? " rtl" : "");
+    const empty = !item.detail || !item.detail.trim();
+    el.innerHTML = `
+      <div class="cad-name" data-rtl="${isHebrew(item.name)}" onclick="toggleCadDetail(this)">${escapeHtml(item.name)}</div>
+      <div class="cad-due muted">${empty ? "empty" : "expand"}</div>
+      <button class="cad-lock" onclick="event.stopPropagation(); delCadItem('${sec.id}','${item.id}')" title="Delete">×</button>
+      <div class="cad-detail" data-rtl="${isHebrew(item.detail||'')}"
+           contenteditable="true" oninput="updCadDetail('${sec.id}','${item.id}',this.innerText)">${escapeHtml(item.detail||"")}</div>
+    `;
+  }
+  return el;
+}
+function updCadValue(secId, itemId, txt) {
+  const it = state.cadence.sections.find(s=>s.id===secId).items.find(i=>i.id===itemId);
+  it.value = txt; save();
+}
+function toggleCadDetail(nameEl) { nameEl.closest(".cad-item").classList.toggle("expanded"); }
+function toggleCad(secId, itemId) {
+  const k = ymKey(new Date());
+  state.cadence.completions[k] = state.cadence.completions[k] || {};
+  if (state.cadence.completions[k][itemId]) delete state.cadence.completions[k][itemId];
+  else state.cadence.completions[k][itemId] = new Date().toISOString().slice(0,10);
+  save(); renderCadence();
+}
+function toggleLock(secId, itemId) {
+  const it = state.cadence.sections.find(s => s.id === secId).items.find(i => i.id === itemId);
+  it.locked = !it.locked; save(); renderCadence();
+}
+function updCadName(secId, itemId, txt) {
+  const it = state.cadence.sections.find(s=>s.id===secId).items.find(i=>i.id===itemId);
+  it.name = txt; save();
+}
+function updCadDetail(secId, itemId, txt) {
+  const it = state.cadence.sections.find(s=>s.id===secId).items.find(i=>i.id===itemId);
+  it.detail = txt; save();
+}
+function delCadItem(secId, itemId) {
+  const sec = state.cadence.sections.find(s=>s.id===secId);
+  const idx = sec.items.findIndex(i => i.id === itemId);
+  if (idx < 0) return;
+  const removed = sec.items.splice(idx, 1)[0];
+  save(); renderCadence();
+  showUndoToast(`"${removed.name}" removed`, () => {
+    sec.items.splice(idx, 0, removed);
+    save(); renderCadence();
+  });
+}
+function addCadItem(secId) {
+  const sec = state.cadence.sections.find(s=>s.id===secId);
+  let newId, focusSel;
+  if (sec.type === "checklist") {
+    newId = uid("c");
+    sec.items.push({ id: newId, name: "New task", dueDay: 7, locked: false, detail: "" });
+  } else if (sec.type === "kv") {
+    newId = uid("kv");
+    sec.items.push({ id: newId, name: "New entry", value: "", unit: "₪", detail: "" });
+  } else {
+    newId = uid("i");
+    sec.items.push({ id: newId, name: "כותרת חדשה", detail: "" });
+  }
+  save(); renderCadence();
+  // Focus the new item's name field for inline editing
+  setTimeout(() => {
+    const items = document.querySelectorAll("#pane-cadence .cad-item");
+    const last = items[items.length - 1];
+    if (!last) return;
+    const nameEl = last.querySelector(".cad-name");
+    if (nameEl) {
+      nameEl.contentEditable = "true";
+      nameEl.focus();
+      const r = document.createRange();
+      r.selectNodeContents(nameEl);
+      const s = window.getSelection();
+      s.removeAllRanges();
+      s.addRange(r);
+    }
+  }, 30);
+}
+
+// ---------- CALCULATOR (floating, draggable, no total) ----------
+if (!state.calcPos) state.calcPos = { x: null, y: null };
+let calcRows = [];
+let dragOffset = null;
+
+function placeCalcWindow() {
+  const win = document.getElementById("calcWindow");
+  let x = state.calcPos.x, y = state.calcPos.y;
+  if (x === null || y === null) {
+    x = Math.max(20, window.innerWidth - 340);
+    y = 80;
+  }
+  win.style.left = x + "px";
+  win.style.top = y + "px";
+}
+function toggleCalcWindow() {
+  const win = document.getElementById("calcWindow");
+  const btn = document.getElementById("calcToggle");
+  const wasOpen = win.classList.contains("open");
+  win.classList.toggle("open");
+  btn.classList.toggle("active");
+  if (!wasOpen) {
+    placeCalcWindow();
+    setTimeout(() => document.getElementById("calcExpr").focus(), 0);
+  }
+}
+function evalMath(expr) {
+  if (!expr || !/^[\d\.\+\-\*\/\(\)\s,xX]+$/.test(expr)) return NaN;
+  const cleaned = expr.replace(/[xX]/g, "*").replace(/,/g, "");
+  try {
+    const r = Function('"use strict"; return (' + cleaned + ')')();
+    return typeof r === "number" && isFinite(r) ? r : NaN;
+  } catch (e) { return NaN; }
+}
+function fmtMoney(n) {
+  return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+function updateCalcLive() {
+  const input = document.getElementById("calcExpr");
+  const out = document.getElementById("calcLive");
+  const val = (input.value || "").trim();
+  if (!val) { out.textContent = ""; out.classList.remove("error"); return; }
+  const r = evalMath(val);
+  if (isNaN(r)) { out.textContent = "?"; out.classList.add("error"); }
+  else { out.textContent = "= " + fmtMoney(r); out.classList.remove("error"); }
+}
+function commitCalc() {
+  const input = document.getElementById("calcExpr");
+  const val = (input.value || "").trim();
+  if (!val) return;
+  const r = evalMath(val);
+  if (isNaN(r)) return;
+  calcRows.push({ expr: val, result: r });
+  input.value = "";
+  document.getElementById("calcLive").textContent = "";
+  renderCalc();
+}
+function renderCalc() {
+  const list = document.getElementById("calcList");
+  if (!calcRows.length) {
+    list.innerHTML = `<div class="calc-empty">Type an expression, press Enter</div>`;
+    return;
+  }
+  list.innerHTML = calcRows.map((r, i) => `
+    <div class="calc-row">
+      <span class="expr">${escapeHtml(r.expr)}</span>
+      <span class="result">${fmtMoney(r.result)}</span>
+      <button class="del" onclick="delCalcRow(${i})">×</button>
+    </div>
+  `).join("");
+}
+function delCalcRow(i) { calcRows.splice(i, 1); renderCalc(); }
+function clearCalc() {
+  if (!calcRows.length) {
+    document.getElementById("calcExpr").value = "";
+    document.getElementById("calcLive").textContent = "";
+    return;
+  }
+  const snapshot = calcRows.slice();
+  calcRows = [];
+  document.getElementById("calcExpr").value = "";
+  document.getElementById("calcLive").textContent = "";
+  renderCalc();
+  showUndoToast(`Cleared ${snapshot.length} calculator row(s)`, () => {
+    calcRows = snapshot;
+    renderCalc();
+  });
+}
+
+// Drag handler — pointer events for mouse + touch
+function startCalcDrag(ev) {
+  const win = document.getElementById("calcWindow");
+  const rect = win.getBoundingClientRect();
+  dragOffset = { x: ev.clientX - rect.left, y: ev.clientY - rect.top };
+  document.addEventListener("pointermove", doCalcDrag);
+  document.addEventListener("pointerup", endCalcDrag);
+  document.addEventListener("pointercancel", endCalcDrag);
+  ev.preventDefault();
+}
+function doCalcDrag(ev) {
+  if (!dragOffset) return;
+  const win = document.getElementById("calcWindow");
+  const rect = win.getBoundingClientRect();
+  let nx = Math.max(0, Math.min(window.innerWidth - rect.width, ev.clientX - dragOffset.x));
+  let ny = Math.max(0, Math.min(window.innerHeight - rect.height, ev.clientY - dragOffset.y));
+  win.style.left = nx + "px";
+  win.style.top = ny + "px";
+}
+function endCalcDrag() {
+  if (!dragOffset) return;
+  dragOffset = null;
+  document.removeEventListener("pointermove", doCalcDrag);
+  document.removeEventListener("pointerup", endCalcDrag);
+  document.removeEventListener("pointercancel", endCalcDrag);
+  const win = document.getElementById("calcWindow");
+  state.calcPos = { x: parseInt(win.style.left, 10), y: parseInt(win.style.top, 10) };
+  save();
+}
+
+// Calc keyboard: live-eval on input, Enter commits, Cmd-K toggles, Esc closes
+document.addEventListener("input", e => {
+  if (e.target.id === "calcExpr") updateCalcLive();
+});
+document.addEventListener("keydown", e => {
+  if (e.target.id === "calcExpr" && e.key === "Enter") {
+    e.preventDefault(); commitCalc(); return;
+  }
+  if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+    e.preventDefault(); toggleCalcWindow();
+  }
+  if (e.key === "Escape" && document.getElementById("calcWindow").classList.contains("open")) {
+    toggleCalcWindow();
+  }
+});
+
+// ---------- DEVICE DETECTION ----------
+// True when running inside an iOS browser (iPhone/iPad). Used to hide UI
+// elements that don't make sense on mobile (e.g. floating calculator).
+const IS_MOBILE = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+  (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+if (IS_MOBILE) document.body.classList.add("is-mobile");
+
+// If the active tab was Guberman (now removed), fall back to Daily.
+if (state.activeTab === "guberman") state.activeTab = "daily";
+
+// ---------- BOOT ----------
+// First paint from local cache (instant)
+renderStrip();
+setupStripInteractions();
+renderDaily(); renderInfo(); renderCadence();
+renderCalc();
+placeCalcWindow();
+document.getElementById("calcHeader").addEventListener("pointerdown", startCalcDrag);
+applyTabHidden();
+const savedTab = state.activeTab && document.querySelector(`.tab[data-tab="${state.activeTab}"]:not(.hidden-tab)`)
+  ? state.activeTab
+  : document.querySelector(".tab:not(.hidden-tab)")?.dataset.tab;
+if (savedTab) setActiveTab(savedTab);
+
+// Then refresh from the Sheet (overwrites cache and re-renders if server has newer/different data)
+loadFromServer();
+
+// Re-sync if the page becomes visible after being backgrounded (catches edits made on another device)
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) { loadFromServer(); refreshBankBalance(); }
+});
+
+// ---------- BANK BALANCE (pushed from cash flow dashboard) ----------
+function refreshBankBalance() {
+  if (!isServerEnabled()) return;
+  apiFetch("getLatestBalance")
+    .then(b => {
+      const pair = document.getElementById("balancePair");
+      const val = document.getElementById("bankBalance");
+      if (!b || typeof b.balance !== "number") {
+        pair.style.display = "none";
+        return;
+      }
+      const formatted = b.balance.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+      val.textContent = "₪" + formatted;
+      // Mark stale if older than 24h
+      const ageHrs = b.timestamp ? (Date.now() - new Date(b.timestamp).getTime()) / 36e5 : 99;
+      val.classList.toggle("stale", ageHrs > 24);
+      val.title = "Last push: " + (b.timestamp ? new Date(b.timestamp).toLocaleString() : "—") +
+                  (b.label ? " · " + b.label : "");
+      pair.style.display = "";
+    })
+    .catch(err => console.warn("Balance fetch failed:", err));
+}
+
+// Initial fetch
+refreshBankBalance();
 </script>
 </body>
 </html>
