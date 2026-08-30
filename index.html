@@ -122,6 +122,7 @@
     box-shadow: inset 0 1px 0 rgba(255,255,255,.08);
   }
   .strip .balance-pair .val.stale { color: #fbbf24; background: rgba(251,191,36,0.12); }
+  .strip .balance-pair .val.refreshing { animation: pulse 0.9s ease-in-out infinite; }
 
   /* Persistent red banner shown when sync is broken */
   .sync-banner {
@@ -1215,7 +1216,7 @@ async function __gateGo(e) {
       <div class="pair"><span class="lbl">תיק ניכויים</span><span class="val" data-key="tikNikuyim" title="Click to copy, double-click to edit"></span></div>
       <div class="pair"><span class="lbl">ניהול ספרים</span><span class="val" id="bkPeriod" data-key="bkPeriod" title="Click to copy, double-click to edit"></span></div>
       <div class="pair balance-pair" id="balancePair" style="display:none">
-        <span class="val" id="bankBalance" title="Latest push from cash flow"></span>
+        <span class="val" id="bankBalance" title="Click to refresh from the cashflow push" onclick="refreshBankBalance(true)"></span>
       </div>
     </div>
     <span class="sync-dot syncing" id="syncDot" title="Connecting…"></span>
@@ -1911,6 +1912,7 @@ function renderStrip() {
 }
 function setupStripInteractions() {
   document.querySelectorAll(".strip .val").forEach(el => {
+    if (el.id === "bankBalance") return; // balance pill refreshes on click instead (refreshBankBalance)
     el.addEventListener("click", () => {
       if (el.contentEditable === "true") return;
       copyText(el.textContent.trim());
@@ -3263,12 +3265,15 @@ document.addEventListener("visibilitychange", () => {
 });
 
 // ---------- BANK BALANCE (pushed from cash flow dashboard) ----------
-function refreshBankBalance() {
+function refreshBankBalance(manual) {
   if (!isServerEnabled()) return;
+  const pill = document.getElementById("bankBalance");
+  if (manual && pill) pill.classList.add("refreshing");
   apiFetch("getLatestBalance")
     .then(b => {
       const pair = document.getElementById("balancePair");
       const val = document.getElementById("bankBalance");
+      if (manual && val) { val.classList.remove("refreshing"); toast("Balance refreshed"); }
       if (!b || typeof b.balance !== "number") {
         pair.style.display = "none";
         return;
@@ -3282,7 +3287,10 @@ function refreshBankBalance() {
                   (b.label ? " · " + b.label : "");
       pair.style.display = "";
     })
-    .catch(err => console.warn("Balance fetch failed:", err));
+    .catch(err => {
+      if (manual && pill) { pill.classList.remove("refreshing"); toast("Couldn't refresh — check your connection"); }
+      console.warn("Balance fetch failed:", err);
+    });
 }
 
 // Initial fetch
