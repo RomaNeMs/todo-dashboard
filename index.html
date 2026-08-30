@@ -520,7 +520,8 @@
     flex-shrink: 0;
     align-self: center;
   }
-  .note-body:hover .note-grab { opacity: .55; }
+  .note-body:hover .note-grab,
+  .task-body:hover .note-grab { opacity: .55; }
   .note-grab:hover { color: var(--accent); opacity: 1 !important; }
   .note-grab:active { cursor: grabbing; }
   body.is-mobile .note-grab { opacity: .45; }
@@ -615,6 +616,7 @@
   .note-act:hover { filter: brightness(1.1); }
   .note-act:active { transform: scale(0.9); }
   .note-body:hover .note-act,
+  .task-body:hover .note-act,
   .hblock-toprow:hover .note-act { opacity: 1; }
   body.is-mobile .note-act { display: none; }               /* mobile: swipe instead */
   body.is-mobile .hblock-toprow .note-act.edit {            /* …except the title pencil */
@@ -2059,7 +2061,7 @@ function renderTasks() {
       <div class="section-head" onclick="toggleTaskBox('${box.id}', event)">
         <div class="title-area"><span>${box.title}</span></div>
         <div class="head-right">
-          <button class="copybtn" onclick="event.stopPropagation(); clearChecked('${box.id}')" title="Remove all checked tasks in this box">Clear checked</button>
+          <button class="add-header-btn" onclick="event.stopPropagation(); clearChecked('${box.id}')" title="Remove all checked tasks in this box">Clear checked</button>
           <button class="add-header-btn" onclick="event.stopPropagation(); addTask('${box.id}')">＋ Task</button>
           <span class="meta">${open}</span>
           <span class="chev">▾</span>
