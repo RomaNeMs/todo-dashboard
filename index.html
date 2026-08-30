@@ -292,6 +292,8 @@
     background: var(--grad-accent);
   }
   .tab.hidden-tab { display: none; }
+  .tab { touch-action: pan-y; }              /* horizontal drag = reorder */
+  .tab.tab-dragging { opacity: .45; }
   /* Settings cog at end of tabs row */
   .tab-cog {
     flex-shrink: 0;
@@ -1296,6 +1298,7 @@ const DEFAULT_DATA = {
   hiddenTabs: [],
   strip: { hp: "", tikNikuyim: "", bkPeriod: "" },
   tasks: { ongoing: [], upcoming: [], collapsed: {} },
+  tabOrder: ["tasks", "daily", "info", "cadence"],
   daily: {
     sections: [
       { id: "accounting", title: "Accounting", people: [], blocks: [] },
@@ -1402,7 +1405,7 @@ function save() {
 // Fields that stay device-local: each device keeps its own copy in localStorage,
 // they're never pushed to the Sheet, and incoming server data doesn't overwrite them.
 // This lets you hide tabs on iPhone but show them on Mac, etc.
-const LOCAL_ONLY_FIELDS = ["hiddenTabs", "activeTab", "calcPos"];
+const LOCAL_ONLY_FIELDS = ["hiddenTabs", "activeTab", "calcPos", "tabOrder"];
 
 function buildSyncedPayload() {
   const out = { ...state };
@@ -1510,6 +1513,7 @@ function renderAll() {
   renderInfo();
   renderCadence();
   applyTabHidden();
+  applyTabOrder();
   if (state.activeTab && document.querySelector(`.tab[data-tab="${state.activeTab}"]:not(.hidden-tab)`)) {
     setActiveTab(state.activeTab);
   }
@@ -1964,8 +1968,68 @@ function setActiveTab(name) {
   save();
 }
 document.querySelectorAll(".tab").forEach(btn => {
-  btn.addEventListener("click", () => setActiveTab(btn.dataset.tab));
+  btn.addEventListener("click", () => {
+    if (Date.now() - _lastTabDragTs < 400) return; // that "click" was a drag release
+    setActiveTab(btn.dataset.tab);
+  });
 });
+
+// ---------- TAB DRAG-REORDER (press a tab and drag sideways) ----------
+// Pointer-based like the task/note reorder, so it works with mouse AND touch.
+// The dragged tab live-reorders in the strip; the order persists per device
+// (tabOrder is in LOCAL_ONLY_FIELDS, alongside hiddenTabs/activeTab).
+let _tabDrag = null;
+let _lastTabDragTs = 0;
+function applyTabOrder() {
+  const nav = document.querySelector(".tabs");
+  if (!nav) return;
+  const cog = nav.querySelector(".tab-cog");
+  const order = (state.tabOrder && state.tabOrder.length) ? state.tabOrder : [];
+  order.forEach(id => {
+    const el = nav.querySelector(`.tab[data-tab="${id}"]`);
+    if (el) nav.insertBefore(el, cog);
+  });
+}
+function _tabDragDown(ev) {
+  _tabDrag = { tab: ev.currentTarget, startX: ev.clientX, started: false };
+  window.addEventListener("pointermove", _tabDragMove, { passive: false });
+  window.addEventListener("pointerup", _tabDragUp);
+  window.addEventListener("pointercancel", _tabDragUp);
+}
+function _tabDragMove(ev) {
+  const d = _tabDrag;
+  if (!d) return;
+  if (!d.started) {
+    if (Math.abs(ev.clientX - d.startX) < 8) return;
+    d.started = true;
+    d.tab.classList.add("tab-dragging");
+    document.body.style.userSelect = "none";
+  }
+  ev.preventDefault();
+  const nav = d.tab.parentElement;
+  for (const o of nav.querySelectorAll(".tab")) {
+    if (o === d.tab) continue;
+    const r = o.getBoundingClientRect();
+    if (r.width && ev.clientX > r.left && ev.clientX < r.right) {
+      nav.insertBefore(d.tab, ev.clientX < r.left + r.width / 2 ? o : o.nextSibling);
+      break;
+    }
+  }
+}
+function _tabDragUp() {
+  window.removeEventListener("pointermove", _tabDragMove);
+  window.removeEventListener("pointerup", _tabDragUp);
+  window.removeEventListener("pointercancel", _tabDragUp);
+  const d = _tabDrag;
+  _tabDrag = null;
+  document.body.style.userSelect = "";
+  if (!d || !d.started) return;
+  d.tab.classList.remove("tab-dragging");
+  _lastTabDragTs = Date.now();
+  state.tabOrder = [...document.querySelectorAll(".tabs .tab")].map(t => t.dataset.tab);
+  save();
+}
+document.querySelectorAll(".tabs .tab").forEach(t => t.addEventListener("pointerdown", _tabDragDown));
 
 // ---------- PERSON CHIP RENDERING ----------
 function renderPersonChip(p, asTitle, sectionId, personIdx) {
@@ -3253,6 +3317,7 @@ renderCalc();
 placeCalcWindow();
 document.getElementById("calcHeader").addEventListener("pointerdown", startCalcDrag);
 applyTabHidden();
+applyTabOrder();
 const savedTab = state.activeTab && document.querySelector(`.tab[data-tab="${state.activeTab}"]:not(.hidden-tab)`)
   ? state.activeTab
   : document.querySelector(".tab:not(.hidden-tab)")?.dataset.tab;
