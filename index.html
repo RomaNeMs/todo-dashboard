@@ -653,6 +653,7 @@
   /* iOS zoom fix: Safari auto-zooms when a focused editable is under 16px.
      Edit mode is entered BEFORE focus, so bumping the size here prevents the zoom. */
   body.is-mobile .ntext[contenteditable="true"],
+  body.is-mobile .ttext[contenteditable="true"],
   body.is-mobile .hblock-title[contenteditable="true"] {
     font-size: 16px;
   }
@@ -770,7 +771,7 @@
     margin: -1px -6px;
     transition: background .12s, box-shadow .12s;
   }
-  .ntext.editing, .hblock-title.editing {
+  .ntext.editing, .hblock-title.editing, .ttext.editing {
     background: var(--s1) !important;
     box-shadow: 0 0 0 1.5px var(--accent), 0 1px 3px rgba(91,79,207,.18);
     outline: none;
@@ -951,7 +952,8 @@
     transition: background .12s, border-color .12s;
   }
   .cad-checkbox:hover { border-color: var(--accent); }
-  .cad-item.completed .cad-checkbox {
+  .cad-item.completed .cad-checkbox,
+  .task-row.done .cad-checkbox {
     background: var(--grad-accent); border-color: transparent; color: white;
     box-shadow: inset 0 1px 0 rgba(255,255,255,.3);
   }
@@ -989,6 +991,46 @@
   }
   .cad-item.expanded .cad-detail { display: block; }
   .cad-detail[data-rtl="true"] { direction: rtl; text-align: right; }
+
+  /* ── Tasks tab ── */
+  .task-row {
+    position: relative; overflow: hidden;
+    border-radius: 8px; margin-bottom: 4px;
+  }
+  .task-row[data-rtl="true"] { direction: rtl; }
+  .task-body {
+    position: relative;
+    display: flex; align-items: center; gap: 7px;
+    padding: 6px 8px; border-radius: 8px;
+    background: var(--s1); border: 1px solid var(--bd);
+    box-shadow: var(--bevel-soft);
+    width: 100%; min-width: 100%;
+    transition: transform .16s cubic-bezier(.2,.8,.3,1);
+    touch-action: pan-y;
+  }
+  body.is-mobile .task-body { padding-top: 10px; padding-bottom: 10px; }
+  .task-row .cad-checkbox { flex-shrink: 0; }
+  .ttext {
+    flex: 1; min-width: 0;
+    padding: 1px 4px; border-radius: 3px; outline: none;
+    font-size: 12.5px; line-height: 1.5;
+    word-break: break-word; overflow-wrap: anywhere;
+    cursor: default;
+  }
+  .ttext[data-rtl="true"] { direction: rtl; }
+  .ttext:empty::before {
+    content: attr(data-ph);
+    color: var(--muted); opacity: .55;
+    pointer-events: none;
+  }
+  .task-row.done .ttext { text-decoration: line-through; opacity: .5; }
+  /* Move button — muted purple, distinct from edit (accent) and delete (red) */
+  .note-act.move { background: linear-gradient(180deg, #8B84C9, #6E68AD); font-size: 11px; }
+  .note-swipe-btn.move { background: linear-gradient(180deg, #8B84C9, #6E68AD); }
+  .note-actions.task-actions { width: 168px; }  /* 3 × 56px buttons */
+  /* Reorder visuals (pointer drag, same mechanism as notes) */
+  .task-row.dragging { opacity: .3; }
+  .task-row.drag-over .task-body { background: var(--accent-soft); box-shadow: 0 0 0 2px var(--accent) inset; }
 
   /* One focus ring for keyboard use */
   button:focus-visible, .tab:focus-visible {
@@ -1207,6 +1249,7 @@ async function __gateGo(e) {
 
   <!-- Tabs -->
   <nav class="tabs" role="tablist">
+    <button class="tab" data-tab="tasks">Tasks</button>
     <button class="tab active" data-tab="daily">Daily</button>
     <button class="tab" data-tab="info">Info</button>
     <button class="tab" data-tab="cadence">Cadence</button>
@@ -1214,6 +1257,7 @@ async function __gateGo(e) {
   </nav>
 
   <main class="content">
+    <section class="pane" id="pane-tasks" data-pane="tasks"></section>
     <section class="pane active" id="pane-daily" data-pane="daily"></section>
     <section class="pane" id="pane-info" data-pane="info"></section>
     <section class="pane" id="pane-cadence" data-pane="cadence"></section>
@@ -1248,6 +1292,7 @@ const DEFAULT_DATA = {
   activeTab: "daily",
   hiddenTabs: [],
   strip: { hp: "", tikNikuyim: "", bkPeriod: "" },
+  tasks: { ongoing: [], upcoming: [], collapsed: {} },
   daily: {
     sections: [
       { id: "accounting", title: "Accounting", people: [], blocks: [] },
@@ -1457,6 +1502,7 @@ function loadFromServer() {
 
 function renderAll() {
   renderStrip();
+  renderTasks();
   renderDaily();
   renderInfo();
   renderCadence();
@@ -1589,7 +1635,7 @@ function updateFormatToolbar() {
   const range = sel.getRangeAt(0);
   const node = range.commonAncestorContainer;
   const el = node.nodeType === 3 ? node.parentElement : node;
-  const editable = el && el.closest && el.closest(".ntext, .hblock-title");
+  const editable = el && el.closest && el.closest(".ntext, .hblock-title, .ttext");
   if (!editable) {
     toolbar.classList.remove("show");
     return;
@@ -1713,6 +1759,7 @@ function toggleTabSettings() {
 function renderTabSettings() {
   const pop = document.getElementById("tabSettingsPop");
   const allTabs = [
+    { id: "tasks", label: "Tasks" },
     { id: "daily", label: "Daily" },
     { id: "info", label: "Info" },
     { id: "cadence", label: "Cadence" }
@@ -1773,6 +1820,7 @@ function importData() {
         save();
         // Re-render everything
         renderStrip();
+        renderTasks();
         renderDaily();
         renderInfo();
         renderCadence();
@@ -1784,6 +1832,7 @@ function importData() {
           state = before;
           save();
           renderStrip();
+          renderTasks();
           renderDaily();
           renderInfo();
           renderCadence();
@@ -1948,6 +1997,195 @@ function popClick(ev, el) {
     const txt = (el.innerText || "").trim();
     if (txt) copyText(txt);
   }, 220);
+}
+
+// ---------- TASKS ----------
+// Two boxes (Ongoing / Upcoming) of short checkable tasks. Same interaction
+// language as Daily notes: gated editing, rich text (B-red/B-black/strike),
+// ⠿ pointer-drag reorder, swipe on iPhone (Edit / Move / Delete), undo toasts.
+// Checked tasks sink to the bottom of their own box; unchecking returns them
+// to the top. "Clear checked" removes a box's done tasks with a bulk undo.
+const TASK_BOXES = [
+  { id: "ongoing",  title: "Ongoing"  },
+  { id: "upcoming", title: "Upcoming" }
+];
+function tasksState() {
+  if (!state.tasks) state.tasks = {};
+  state.tasks.ongoing   = state.tasks.ongoing   || [];
+  state.tasks.upcoming  = state.tasks.upcoming  || [];
+  state.tasks.collapsed = state.tasks.collapsed || {};
+  return state.tasks;
+}
+function renderTasks() {
+  const root = document.getElementById("pane-tasks");
+  if (!root) return;
+  const ts = tasksState();
+  root.innerHTML = "";
+  const pencilSvg = `<svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>`;
+  TASK_BOXES.forEach(box => {
+    const items = ts[box.id];
+    const open = items.filter(t => !t.done).length;
+    const collapsed = !!ts.collapsed[box.id];
+    const other = box.id === "ongoing" ? "Upcoming" : "Ongoing";
+    const arrow = box.id === "ongoing" ? "↓" : "↑";
+    const rows = items.map(t => {
+      const rtl = isHebrew(t.html || "");
+      return `
+      <div class="task-row${t.done ? " done" : ""}" data-rtl="${rtl}" data-task-id="${t.id}">
+        <div class="note-actions task-actions">
+          <button class="note-swipe-btn edit" onclick="taskEditStart('${t.id}')">Edit</button>
+          <button class="note-swipe-btn move" onclick="moveTask('${box.id}','${t.id}')">Move</button>
+          <button class="note-swipe-btn del" onclick="delTask('${box.id}','${t.id}')">Delete</button>
+        </div>
+        <div class="task-body"
+             ontouchstart="noteSwipeStart(event)"
+             ontouchmove="noteSwipeMove(event)"
+             ontouchend="noteSwipeEnd(event)">
+          <span class="note-grab" title="Drag to reorder" onpointerdown="taskReorderStart(event,'${box.id}','${t.id}')">⠿</span>
+          <button class="cad-checkbox" onclick="toggleTask('${box.id}','${t.id}')" title="${t.done ? "Mark not done" : "Mark done"}">${t.done ? "✓" : ""}</button>
+          <span class="ttext" data-rtl="${rtl}" data-ph="New task…" data-task-id="${t.id}"
+                oninput="updTask('${box.id}','${t.id}',this.innerHTML)">${t.html || ""}</span>
+          <button class="note-act edit" title="Edit" onclick="taskEditStart('${t.id}')">${pencilSvg}</button>
+          <button class="note-act move" title="Move to ${other}" onclick="moveTask('${box.id}','${t.id}')">${arrow}</button>
+          <button class="note-act del" title="Delete" onclick="delTask('${box.id}','${t.id}')">×</button>
+        </div>
+      </div>`;
+    }).join("");
+    const sec = document.createElement("div");
+    sec.className = "section" + (collapsed ? " collapsed" : "");
+    sec.innerHTML = `
+      <div class="section-head" onclick="toggleTaskBox('${box.id}', event)">
+        <div class="title-area"><span>${box.title}</span></div>
+        <div class="head-right">
+          <button class="copybtn" onclick="event.stopPropagation(); clearChecked('${box.id}')" title="Remove all checked tasks in this box">Clear checked</button>
+          <button class="add-header-btn" onclick="event.stopPropagation(); addTask('${box.id}')">＋ Task</button>
+          <span class="meta">${open}</span>
+          <span class="chev">▾</span>
+        </div>
+      </div>
+      <div class="section-body task-list" data-box="${box.id}">${rows}</div>
+    `;
+    root.appendChild(sec);
+  });
+}
+function toggleTaskBox(boxId, ev) {
+  if (ev && (ev.target.closest(".copybtn") || ev.target.closest(".add-header-btn"))) return;
+  if (Date.now() - _lastSwipeTs < 400) return; // ignore the click trailing a swipe
+  const ts = tasksState();
+  ts.collapsed[boxId] = !ts.collapsed[boxId];
+  save(); renderTasks();
+}
+function _findTask(boxId, id) {
+  const arr = tasksState()[boxId];
+  return { arr, i: arr.findIndex(t => t.id === id) };
+}
+function addTask(boxId) {
+  const ts = tasksState();
+  if (ts.collapsed[boxId]) ts.collapsed[boxId] = false;
+  const id = uid("t");
+  ts[boxId].unshift({ id, html: "", done: false });  // new tasks appear at the top
+  save(); renderTasks();
+  taskEditStart(id);
+}
+function taskEditStart(id) {
+  _enterEdit(document.querySelector(`.ttext[data-task-id="${id}"]`));
+}
+function updTask(boxId, id, html) {
+  const { arr, i } = _findTask(boxId, id);
+  if (i < 0) return;
+  arr[i].html = sanitizeRichText(html);
+  save();
+}
+function toggleTask(boxId, id) {
+  const { arr, i } = _findTask(boxId, id);
+  if (i < 0) return;
+  const [t] = arr.splice(i, 1);
+  t.done = !t.done;
+  if (t.done) arr.push(t);      // checked → sinks to the bottom of its box
+  else arr.unshift(t);          // unchecked → back to the top
+  save(); renderTasks();
+}
+function moveTask(boxId, id) {
+  const { arr, i } = _findTask(boxId, id);
+  if (i < 0) return;
+  const other = boxId === "ongoing" ? "upcoming" : "ongoing";
+  const [t] = arr.splice(i, 1);
+  tasksState()[other].unshift(t);
+  closeNoteSwipe();
+  save(); renderTasks();
+}
+function delTask(boxId, id) {
+  const { arr, i } = _findTask(boxId, id);
+  if (i < 0) return;
+  const [removed] = arr.splice(i, 1);
+  save(); renderTasks();
+  showUndoToast("Task removed", () => {
+    const a = tasksState()[boxId];
+    a.splice(Math.min(i, a.length), 0, removed);
+    save(); renderTasks();
+  });
+}
+function clearChecked(boxId) {
+  const ts = tasksState();
+  const before = ts[boxId];
+  const kept = before.filter(t => !t.done);
+  const removed = before.length - kept.length;
+  if (!removed) { toast("Nothing checked here"); return; }
+  ts[boxId] = kept;
+  save(); renderTasks();
+  showUndoToast(removed + (removed === 1 ? " checked task cleared" : " checked tasks cleared"), () => {
+    tasksState()[boxId] = before;
+    save(); renderTasks();
+  });
+}
+// Task reorder — same pointer-drag mechanism as note reorder, per box.
+let _tr = null;
+function taskReorderStart(ev, boxId, id) {
+  ev.preventDefault();
+  ev.stopPropagation();
+  const listEl = ev.target.closest(".task-list");
+  if (!listEl) return;
+  const rows = [...listEl.querySelectorAll(".task-row")].map(el => {
+    const r = el.getBoundingClientRect();
+    return { id: el.dataset.taskId, el, mid: r.top + r.height / 2 };
+  });
+  _tr = { boxId, fromId: id, rows, overId: id };
+  const src = rows.find(r => r.id === id);
+  if (src) src.el.classList.add("dragging");
+  document.body.style.userSelect = "none";
+  window.addEventListener("pointermove", taskReorderMove, { passive: false });
+  window.addEventListener("pointerup", taskReorderEnd);
+  window.addEventListener("pointercancel", taskReorderEnd);
+}
+function taskReorderMove(ev) {
+  if (!_tr) return;
+  ev.preventDefault();
+  let best = null, bestDist = Infinity;
+  for (const r of _tr.rows) {
+    const d = Math.abs(ev.clientY - r.mid);
+    if (d < bestDist) { bestDist = d; best = r; }
+  }
+  if (!best || best.id === _tr.overId) return;
+  _tr.overId = best.id;
+  _tr.rows.forEach(r => r.el.classList.toggle("drag-over", r.id === best.id && r.id !== _tr.fromId));
+}
+function taskReorderEnd() {
+  window.removeEventListener("pointermove", taskReorderMove);
+  window.removeEventListener("pointerup", taskReorderEnd);
+  window.removeEventListener("pointercancel", taskReorderEnd);
+  document.body.style.userSelect = "";
+  if (!_tr) return;
+  const { boxId, fromId, overId, rows } = _tr;
+  rows.forEach(r => r.el.classList.remove("dragging", "drag-over"));
+  _tr = null;
+  if (fromId === overId) return;
+  const arr = tasksState()[boxId];
+  const from = arr.findIndex(t => t.id === fromId);
+  const to = arr.findIndex(t => t.id === overId);
+  if (from < 0 || to < 0) return;
+  const [moved] = arr.splice(from, 1);
+  arr.splice(to, 0, moved);
+  save(); renderTasks();
 }
 
 // ---------- DAILY ----------
@@ -2242,7 +2480,12 @@ function noteReorderEnd() {
 // Same pattern as the personal dashboard's item rows: direction-lock so vertical
 // scrolling stays native; the body slides over absolutely-positioned Edit/Delete
 // buttons; release past halfway snaps open, otherwise snaps shut.
-const NOTE_SWIPE_OPEN = -112; // matches .note-actions width (2 × 56px buttons)
+// Swipe-open distance is measured per row from its .note-actions width
+// (2 buttons on notes/headers, 3 on tasks). 112 is the fallback.
+function _swipeOpenX(body) {
+  const acts = body.parentElement.querySelector(".note-actions");
+  return (acts && acts.offsetWidth) ? -acts.offsetWidth : null;
+}
 let _ns = null;              // in-flight gesture { body, startX, startY, openAt, locked, x }
 let _nsOpenBody = null;      // the one row currently left open, if any
 let _lastSwipeTs = 0;        // when the last horizontal swipe ended (suppresses its trailing click)
@@ -2253,7 +2496,9 @@ function noteSwipeStart(ev) {
   const body = ev.currentTarget;
   if (_nsOpenBody && _nsOpenBody !== body) closeNoteSwipe();
   const t = ev.touches[0];
-  _ns = { body, startX: t.clientX, startY: t.clientY, openAt: body === _nsOpenBody ? NOTE_SWIPE_OPEN : 0, locked: null, x: 0 };
+  const openW = _swipeOpenX(body); // measurable only if already open (display:none otherwise)
+  _ns = { body, startX: t.clientX, startY: t.clientY, open: openW,
+          openAt: (body === _nsOpenBody && openW) ? openW : 0, locked: null, x: 0 };
 }
 function noteSwipeMove(ev) {
   if (!_ns) return;
@@ -2266,15 +2511,16 @@ function noteSwipeMove(ev) {
   if (_ns.locked !== "h") return;
   ev.preventDefault();
   _ns.body.parentElement.classList.add("swipe-active");
-  _ns.x = Math.max(NOTE_SWIPE_OPEN, Math.min(0, _ns.openAt + dx));
+  if (_ns.open === null) _ns.open = _swipeOpenX(_ns.body) || -112;
+  _ns.x = Math.max(_ns.open, Math.min(0, _ns.openAt + dx));
   _ns.body.style.transform = `translateX(${_ns.x}px)`;
 }
 function noteSwipeEnd() {
   if (!_ns) return;
   if (_ns.locked === "h") _lastSwipeTs = Date.now();
   const settled = _ns.locked === "h" ? _ns.x : _ns.openAt;
-  if (settled < NOTE_SWIPE_OPEN / 2) {
-    _ns.body.style.transform = `translateX(${NOTE_SWIPE_OPEN}px)`;
+  if (_ns.open !== null && settled < _ns.open / 2) {
+    _ns.body.style.transform = `translateX(${_ns.open}px)`;
     _nsOpenBody = _ns.body;
   } else {
     _ns.body.style.transform = "";
@@ -2998,7 +3244,7 @@ if (state.activeTab === "guberman") state.activeTab = "daily";
 // First paint from local cache (instant)
 renderStrip();
 setupStripInteractions();
-renderDaily(); renderInfo(); renderCadence();
+renderTasks(); renderDaily(); renderInfo(); renderCadence();
 renderCalc();
 placeCalcWindow();
 document.getElementById("calcHeader").addEventListener("pointerdown", startCalcDrag);
