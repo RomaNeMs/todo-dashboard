@@ -495,14 +495,13 @@
     flex-shrink: 0; opacity: .6;
   }
   .person-add:hover { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); opacity: 1; }
-  /* Dashed add-row for new contact groups on the Info tab */
-  .add-group-ghost {
-    width: 100%; margin: 2px 0 12px;
-    padding: 6px 10px;
-    border: 1px dashed var(--bd);
-    justify-content: center;
-  }
-  .add-group-ghost:hover { border-color: var(--accent); }
+  /* Info reorder: reveal grab handles on hover; drag visuals */
+  .cg-card:hover .cg-grab,
+  .contact-row:hover .contact-grab { opacity: .55; }
+  .cg-card.dragging { opacity: .35; }
+  .cg-card.drag-over { outline: 2px dashed var(--accent); outline-offset: 2px; }
+  .contact-row.dragging { opacity: .3; }
+  .contact-row.drag-over { background: var(--accent-soft); box-shadow: 0 0 0 2px var(--accent) inset; }
 
   /* Header block — title row on top, notes stacked one per line below */
   /* Pill style — every Daily block is its own bordered card */
@@ -2684,6 +2683,71 @@ function updNote(sid, bid, i, t) {
 }
 
 // ---------- INFO ----------
+// ---------- GENERIC POINTER REORDER (vertical) ----------
+// Same mechanism as note/task reorder: measure row midpoints at drag start,
+// highlight the closest row, commit(fromKey, toKey) on release. Works with
+// mouse and touch (handles carry touch-action: none via .note-grab).
+let _pr = null;
+function startPointerReorder(ev, rowEls, srcKey, commit) {
+  ev.preventDefault();
+  ev.stopPropagation();
+  const rows = rowEls.map(el => {
+    const r = el.getBoundingClientRect();
+    return { key: el.dataset.reorderKey, el, mid: r.top + r.height / 2 };
+  });
+  _pr = { rows, fromKey: srcKey, overKey: srcKey, commit };
+  const s = rows.find(r => r.key === srcKey);
+  if (s) s.el.classList.add("dragging");
+  document.body.style.userSelect = "none";
+  window.addEventListener("pointermove", _prMove, { passive: false });
+  window.addEventListener("pointerup", _prEnd);
+  window.addEventListener("pointercancel", _prEnd);
+}
+function _prMove(ev) {
+  if (!_pr) return;
+  ev.preventDefault();
+  let best = null, bestDist = Infinity;
+  for (const r of _pr.rows) {
+    const d = Math.abs(ev.clientY - r.mid);
+    if (d < bestDist) { bestDist = d; best = r; }
+  }
+  if (!best || best.key === _pr.overKey) return;
+  _pr.overKey = best.key;
+  _pr.rows.forEach(r => r.el.classList.toggle("drag-over", r.key === best.key && r.key !== _pr.fromKey));
+}
+function _prEnd() {
+  window.removeEventListener("pointermove", _prMove);
+  window.removeEventListener("pointerup", _prEnd);
+  window.removeEventListener("pointercancel", _prEnd);
+  document.body.style.userSelect = "";
+  if (!_pr) return;
+  const { rows, fromKey, overKey, commit } = _pr;
+  rows.forEach(r => r.el.classList.remove("dragging", "drag-over"));
+  _pr = null;
+  if (fromKey !== overKey) commit(fromKey, overKey);
+}
+function cgReorderStart(ev, id) {
+  startPointerReorder(ev, [...document.querySelectorAll(".cg-card")], id, (from, to) => {
+    const gs = state.info.contactGroups || [];
+    const f = gs.findIndex(g => g.id === from), t = gs.findIndex(g => g.id === to);
+    if (f < 0 || t < 0) return;
+    const [m] = gs.splice(f, 1);
+    gs.splice(t, 0, m);
+    save(); renderInfo();
+  });
+}
+function contactReorderStart(ev, groupId, idx) {
+  const card = ev.target.closest(".icard");
+  if (!card) return;
+  startPointerReorder(ev, [...card.querySelectorAll(".contact-row")], String(idx), (from, to) => {
+    const g = _cg(groupId);
+    if (!g) return;
+    const [m] = g.contacts.splice(+from, 1);
+    g.contacts.splice(+to, 0, m);
+    save(); renderInfo();
+  });
+}
+
 // One-time shape migration: the original fixed contacts {ey, legal} become
 // the first two entries of the dynamic contactGroups list.
 function migrateContacts_() {
@@ -2736,7 +2800,8 @@ function renderInfo() {
       ? `<span class="phone dbl-edit copyable" data-update="contact:${group}:${i}:phone" onclick="popClick(event, this)" title="Click to copy · Double-click to edit">${escapeHtml(c.phone)}</span>`
       : `<button class="add-phone" onclick="addContactPhone('${group}',${i})" title="Add phone">+ phone</button>`;
     return `
-      <div class="contact-row${isHe ? ' rtl' : ''}">
+      <div class="contact-row${isHe ? ' rtl' : ''}" data-reorder-key="${i}">
+        <span class="note-grab contact-grab" title="Drag to reorder" onpointerdown="contactReorderStart(event,'${group}',${i})">⠿</span>
         <span class="role dbl-edit copyable" data-update="contact:${group}:${i}:role" onclick="popClick(event, this)" title="Click to copy · Double-click to edit">${escapeHtml(c.role)}</span>
         <span class="name-block">
           <span class="he dbl-edit copyable" data-update="contact:${group}:${i}:he" onclick="popClick(event, this)" title="Click to copy · Double-click to edit">${escapeHtml(c.he)}</span>
@@ -2749,10 +2814,14 @@ function renderInfo() {
 
   (state.info.contactGroups || []).forEach(g => {
     const card = document.createElement("div");
-    card.className = "icard";
+    card.className = "icard cg-card";
+    card.dataset.reorderKey = g.id;
     card.innerHTML = `
       <div class="icard-head">
-        <h3 class="dbl-edit" data-update="cgTitle:${g.id}" title="Double-click to rename group">${escapeHtml(g.title)}</h3>
+        <span style="display:flex; align-items:center; gap:6px; min-width:0;">
+          <span class="note-grab cg-grab" title="Drag to reorder groups" onpointerdown="cgReorderStart(event,'${g.id}')">⠿</span>
+          <h3 class="dbl-edit" data-update="cgTitle:${g.id}" title="Double-click to rename group">${escapeHtml(g.title)}</h3>
+        </span>
         <span style="display:flex; align-items:center; gap:6px;">
           <button class="icard-add" onclick="addContact('${g.id}')" title="Add contact">+</button>
           <button class="row-del" onclick="delContactGroup('${g.id}')" title="Delete this group">×</button>
@@ -2762,7 +2831,9 @@ function renderInfo() {
     root.appendChild(card);
   });
   root.insertAdjacentHTML("beforeend",
-    `<button class="add-ghost add-group-ghost" onclick="addContactGroup()">＋ Add contact group</button>`);
+    `<div style="display:flex; justify-content:flex-end; margin:2px 2px 12px;">
+       <button class="add-header-btn" onclick="addContactGroup()" title="Add a new contact group">＋ Group</button>
+     </div>`);
 
   // Procedures — collapsible bubbles, dbl-click title or body to edit, "+" inline
   const procWrap = document.createElement("div");
