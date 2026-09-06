@@ -477,6 +477,32 @@
     transition: background .12s;
   }
   .person-popover .p-row .val.copyable:hover { background: var(--accent-soft); color: var(--accent); }
+  .person-popover .p-row .val { min-width: 60px; display: inline-block; }
+  .person-popover .p-row .val:empty::before { content: "—"; color: var(--muted); opacity: .5; }
+  .person-popover .p-remove {
+    margin-top: 8px; padding: 2px 8px;
+    font-size: 11px; font-weight: 600; color: var(--red);
+    background: var(--red-bg); border-radius: 8px;
+  }
+  .person-popover .p-remove:hover { filter: brightness(0.96); }
+  /* "+" ghost chip next to the people chips — adds a person to the section */
+  .person-add {
+    width: 18px; height: 18px; border-radius: 50%;
+    background: var(--s2); color: var(--muted);
+    border: 1px dashed var(--bd);
+    font-size: 12px; line-height: 1;
+    display: inline-flex; align-items: center; justify-content: center;
+    flex-shrink: 0; opacity: .6;
+  }
+  .person-add:hover { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); opacity: 1; }
+  /* Dashed add-row for new contact groups on the Info tab */
+  .add-group-ghost {
+    width: 100%; margin: 2px 0 12px;
+    padding: 6px 10px;
+    border: 1px dashed var(--bd);
+    justify-content: center;
+  }
+  .add-group-ghost:hover { border-color: var(--accent); }
 
   /* Header block — title row on top, notes stacked one per line below */
   /* Pill style — every Daily block is its own bordered card */
@@ -1311,7 +1337,7 @@ const DEFAULT_DATA = {
   },
   info: {
     banks: [],
-    contacts: { ey: [], legal: [] },
+    contactGroups: [],  // [{id, title, contacts: [{role, he, en?, phone?}]}] — dynamic bubbles
     procedures: [],
     procExpanded: {} // procId -> bool
   },
@@ -2047,12 +2073,34 @@ function renderPersonChip(p, asTitle, sectionId, personIdx) {
       ${escapeHtml(chipLabel)}
       <span class="person-popover">
         <div class="p-name dbl-edit" data-update="person:${sid}:${pi}:name" title="Double-click to edit name">${escapeHtml(p.name)}</div>
-        ${hasEmail ? `<div class="p-row"><span class="lbl">Email</span><span class="val copyable dbl-edit" data-update="person:${sid}:${pi}:email" onclick="popClick(event, this)" title="Click to copy · Double-click to edit">${escapeHtml(p.email)}</span></div>` : ""}
-        ${hasPhone ? `<div class="p-row"><span class="lbl">Phone</span><span class="val copyable dbl-edit" data-update="person:${sid}:${pi}:phone" onclick="popClick(event, this)" title="Click to copy · Double-click to edit">${escapeHtml(p.phone)}</span></div>` : ""}
+        <div class="p-row"><span class="lbl">Email</span><span class="val copyable dbl-edit" data-update="person:${sid}:${pi}:email" onclick="popClick(event, this)" title="Click to copy · Double-click to edit">${escapeHtml(p.email || "")}</span></div>
+        <div class="p-row"><span class="lbl">Phone</span><span class="val copyable dbl-edit" data-update="person:${sid}:${pi}:phone" onclick="popClick(event, this)" title="Click to copy · Double-click to edit">${escapeHtml(p.phone || "")}</span></div>
         <div class="p-row"><span class="lbl">Note</span><span class="val dbl-edit" data-update="person:${sid}:${pi}:note">${escapeHtml(p.note || "")}</span></div>
+        ${p.isTitle ? "" : `<button class="p-remove" onclick="delPerson('${sid}',${pi})">Remove person</button>`}
       </span>
     </span>
   `;
+}
+function addPerson(sid) {
+  const sec = state.daily.sections.find(s => s.id === sid);
+  if (!sec) return;
+  sec.people = sec.people || [];
+  const idx = sec.people.length;
+  sec.people.push({ name: "New person", email: "", phone: "", note: "" });
+  save(); renderDaily();
+  // Focusing the popover's name field keeps the popover open (:focus-within)
+  focusAndSelect(`[data-update="person:${sid}:${idx}:name"]`);
+}
+function delPerson(sid, i) {
+  const sec = state.daily.sections.find(s => s.id === sid);
+  if (!sec || !sec.people?.[i]) return;
+  if (sec.people[i].isTitle) { toast("This person is the section title — can't remove"); return; }
+  const removed = sec.people.splice(i, 1)[0];
+  save(); renderDaily();
+  showUndoToast(`"${removed.name}" removed`, () => {
+    sec.people.splice(Math.min(i, sec.people.length), 0, removed);
+    save(); renderDaily();
+  });
 }
 // Click-to-copy with double-click-edit coexistence (popover + Info tab)
 function popClick(ev, el) {
@@ -2268,13 +2316,15 @@ function renderDaily() {
     // Eric uses his name as the section title (no extra chip).
     // Other sections render plain title + chips for each person.
     let titleHtml;
+    const addBtn = `<button class="person-add" onclick="event.stopPropagation(); addPerson('${section.id}')" title="Add person">+</button>`;
     if (section.titleAsPerson) {
       const titleIdx = (section.people || []).findIndex(p => p.isTitle);
       const titlePerson = titleIdx >= 0 ? section.people[titleIdx] : (section.people || [])[0];
-      titleHtml = renderPersonChip(titlePerson, true, section.id, titleIdx >= 0 ? titleIdx : 0);
+      const chips = (section.people || []).map((p, i) => p.isTitle ? "" : renderPersonChip(p, false, section.id, i)).join(" ");
+      titleHtml = renderPersonChip(titlePerson, true, section.id, titleIdx >= 0 ? titleIdx : 0) + chips + addBtn;
     } else {
       const chips = (section.people || []).map((p, i) => p.isTitle ? "" : renderPersonChip(p, false, section.id, i)).join(" ");
-      titleHtml = `<span>${escapeHtml(section.title)}</span>` + chips;
+      titleHtml = `<span>${escapeHtml(section.title)}</span>` + chips + addBtn;
     }
 
     sec.innerHTML = `
@@ -2295,7 +2345,7 @@ function renderDaily() {
 }
 function toggleDailySection(id, ev) {
   // Don't toggle if clicking on a person-chip or its popover
-  if (ev && (ev.target.closest(".person-chip") || ev.target.closest(".person-popover"))) return;
+  if (ev && (ev.target.closest(".person-chip") || ev.target.closest(".person-popover") || ev.target.closest(".person-add"))) return;
   state.daily.sectionCollapsed[id] = !state.daily.sectionCollapsed[id];
   save(); renderDaily();
 }
@@ -2634,8 +2684,27 @@ function updNote(sid, bid, i, t) {
 }
 
 // ---------- INFO ----------
+// One-time shape migration: the original fixed contacts {ey, legal} become
+// the first two entries of the dynamic contactGroups list.
+function migrateContacts_() {
+  const info = state.info || (state.info = {});
+  if (!info.contactGroups) {
+    const legacy = info.contacts || {};
+    info.contactGroups = [
+      { id: "ey",    title: "EY — External auditors", contacts: legacy.ey || [] },
+      { id: "legal", title: "Legal",                  contacts: legacy.legal || [] }
+    ];
+    delete info.contacts;
+  }
+  return info.contactGroups;
+}
+function _cg(groupId) {
+  return (state.info.contactGroups || []).find(g => g.id === groupId);
+}
+
 function renderInfo() {
   const root = document.getElementById("pane-info");
+  migrateContacts_();
   root.innerHTML = "";
 
   // Bank cards — click value to copy, double-click any field to edit; "+" adds row; hover for ×
@@ -2678,25 +2747,22 @@ function renderInfo() {
     `;
   };
 
-  const ey = document.createElement("div");
-  ey.className = "icard";
-  ey.innerHTML = `
-    <div class="icard-head">
-      <h3>EY — External auditors</h3>
-      <button class="icard-add" onclick="addContact('ey')" title="Add contact">+</button>
-    </div>` +
-    state.info.contacts.ey.map((c, i) => renderContact('ey', c, i)).join("");
-  root.appendChild(ey);
-
-  const lg = document.createElement("div");
-  lg.className = "icard";
-  lg.innerHTML = `
-    <div class="icard-head">
-      <h3>Legal</h3>
-      <button class="icard-add" onclick="addContact('legal')" title="Add contact">+</button>
-    </div>` +
-    state.info.contacts.legal.map((c, i) => renderContact('legal', c, i)).join("");
-  root.appendChild(lg);
+  (state.info.contactGroups || []).forEach(g => {
+    const card = document.createElement("div");
+    card.className = "icard";
+    card.innerHTML = `
+      <div class="icard-head">
+        <h3 class="dbl-edit" data-update="cgTitle:${g.id}" title="Double-click to rename group">${escapeHtml(g.title)}</h3>
+        <span style="display:flex; align-items:center; gap:6px;">
+          <button class="icard-add" onclick="addContact('${g.id}')" title="Add contact">+</button>
+          <button class="row-del" onclick="delContactGroup('${g.id}')" title="Delete this group">×</button>
+        </span>
+      </div>` +
+      (g.contacts || []).map((c, i) => renderContact(g.id, c, i)).join("");
+    root.appendChild(card);
+  });
+  root.insertAdjacentHTML("beforeend",
+    `<button class="add-ghost add-group-ghost" onclick="addContactGroup()">＋ Add contact group</button>`);
 
   // Procedures — collapsible bubbles, dbl-click title or body to edit, "+" inline
   const procWrap = document.createElement("div");
@@ -2777,23 +2843,48 @@ function delBankRow(bi, ri) {
   });
 }
 function addContact(group) {
-  const newIdx = state.info.contacts[group].length;
-  state.info.contacts[group].push({ role: "Role", he: "שם", en: "" });
+  const g = _cg(group);
+  if (!g) return;
+  const newIdx = g.contacts.length;
+  g.contacts.push({ role: "Role", he: "שם", en: "" });
   save(); renderInfo();
   focusAndSelect(`[data-update="contact:${group}:${newIdx}:role"]`);
 }
 function delContact(group, i) {
-  const removed = state.info.contacts[group].splice(i, 1)[0];
+  const g = _cg(group);
+  if (!g) return;
+  const removed = g.contacts.splice(i, 1)[0];
   save(); renderInfo();
   showUndoToast(`Contact "${removed.he || removed.en || removed.role}" removed`, () => {
-    state.info.contacts[group].splice(i, 0, removed);
+    g.contacts.splice(i, 0, removed);
     save(); renderInfo();
   });
 }
 function addContactPhone(group, i) {
-  state.info.contacts[group][i].phone = "Phone";
+  const g = _cg(group);
+  if (!g || !g.contacts[i]) return;
+  g.contacts[i].phone = "Phone";
   save(); renderInfo();
   focusAndSelect(`[data-update="contact:${group}:${i}:phone"]`);
+}
+function addContactGroup() {
+  migrateContacts_();
+  const g = { id: uid("cg"), title: "New group", contacts: [] };
+  state.info.contactGroups.push(g);
+  save(); renderInfo();
+  focusAndSelect(`[data-update="cgTitle:${g.id}"]`);
+}
+function delContactGroup(id) {
+  const groups = state.info.contactGroups || [];
+  const idx = groups.findIndex(g => g.id === id);
+  if (idx < 0) return;
+  const removed = groups.splice(idx, 1)[0];
+  save(); renderInfo();
+  const n = (removed.contacts || []).length;
+  showUndoToast(`Group "${removed.title}"${n ? " (" + n + " contacts)" : ""} removed`, () => {
+    groups.splice(idx, 0, removed);
+    save(); renderInfo();
+  });
 }
 function addProc() {
   const newProc = { id: uid("proc"), ttl: "כותרת חדשה", body: "" };
@@ -2880,7 +2971,11 @@ function applyDblEditUpdate(path, txt, opts) {
     if (state.info.banks[bi]?.rows[ri]) state.info.banks[bi].rows[ri][field] = txt;
   } else if (parts[0] === "contact") {
     const group = parts[1], i = +parts[2], field = parts[3];
-    if (state.info.contacts[group]?.[i]) state.info.contacts[group][i][field] = txt;
+    const g = _cg(group);
+    if (g?.contacts?.[i]) g.contacts[i][field] = txt;
+  } else if (parts[0] === "cgTitle") {
+    const g = _cg(parts[1]);
+    if (g) g.title = txt;
   } else if (parts[0] === "proc") {
     const p = state.info.procedures.find(x => x.id === parts[1]);
     if (p) p[parts[2]] = txt;
