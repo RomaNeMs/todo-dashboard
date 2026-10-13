@@ -1189,7 +1189,7 @@
 </form>
 </div>
 <script>
-const __GATE_VAULT = { salt: "tW5x0oo6HeMqRFVsSPQCeA==", iv: "e7s9W1qtYAFZ98hR", data: "njZM3oDSzdkpwID+C85pVhcmS/6qMgn010/pMXxyJUqhYHkhZqhHIfszDDngPI0WaP+42BHfAiC995wJOEmgYjEVqh/Ybt2vkVnBQrAO036v92sxtwHUiRqOl7LTmdpm3BxUJM1WU05yNDFVdrflPMeAGJ99zAimvCsrZBLfqNn6SrV1EHl9I+M64hu9s71drwPR6f61W1/MiUyod/KlQA8Yk0pRx5Bpfko7NVmI9gff7ZscxQ==" };
+const __GATE_VAULT = { salt: "k9izD4Eq67HUSp66v82IjA==", iv: "zn2aOc+sF4vNyP0S", data: "M78xIvxSnLixfgUEPwR4KNdeI/rmy16E10cq2X+Cc8Kx13WkW7ty7IIXygo+vqfWlJg7eCifci9/9k2IOC17vBhHhc0LCg5AsoYvAprcv3EXMQ6DCjkgZLcPkyen2+3448cOox4KH99Srve5r863vYIWO20q1tx1w8dj5cwcg+9hJw46a4820zQzRdZOQN/1ZVDGpdbbOzarCiGunj2aFxNM7pIsWd0A1mKgXsViybIrJmrhtw==" };
 const __GATE_LS = 'todo.exec.url.v2';
 
 (function () {
@@ -1206,8 +1206,16 @@ const __GATE_LS = 'todo.exec.url.v2';
       '<span style="font-size:12px;font-weight:400;color:#7874A8">Then delete the old home-screen icon and add this page instead.</span></a>';
     return;
   }
-  let saved = null;
-  try { saved = localStorage.getItem(__GATE_LS); } catch (e) {}
+  let saved = null, fp = null;
+  try { saved = localStorage.getItem(__GATE_LS); fp = localStorage.getItem('todo.vault.fp'); } catch (e) {}
+  if (saved && fp !== __GATE_VAULT.salt) {
+    // Passcode/key was rotated: drop the old keyed URL so this device must unlock again.
+    // Runs before the app reads API_URL, so the app stays local-only behind the gate.
+    try { localStorage.removeItem(__GATE_LS); } catch (e) {}
+    saved = null;
+    const hint = document.querySelector('#gate .gate-hint');
+    if (hint) hint.textContent = 'The passcode was changed — enter the new one';
+  }
   if (saved) document.getElementById('gate').remove();
 })();
 
@@ -1224,7 +1232,7 @@ async function __gateGo(e) {
     const plain = await crypto.subtle.decrypt(
       { name: 'AES-GCM', iv: __gateB64d(__GATE_VAULT.iv) }, key, __gateB64d(__GATE_VAULT.data));
     const url = new TextDecoder().decode(plain);
-    try { localStorage.setItem(__GATE_LS, url); } catch (e2) {}
+    try { localStorage.setItem(__GATE_LS, url); localStorage.setItem('todo.vault.fp', __GATE_VAULT.salt); } catch (e2) {}
     window.location.reload();
   } catch (e3) {
     const card = document.getElementById('gate-card');
